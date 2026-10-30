@@ -25,11 +25,11 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/oleksiipro1/wp-to-payload.git"
+    "url": "git+https://github.com/OleksiiPro1/wp-to-payload.git"
   },
-  "homepage": "https://github.com/oleksiipro1/wp-to-payload#readme",
+  "homepage": "https://github.com/OleksiiPro1/wp-to-payload#readme",
   "bugs": {
-    "url": "https://github.com/oleksiipro1/wp-to-payload/issues"
+    "url": "https://github.com/OleksiiPro1/wp-to-payload/issues"
   },
   "keywords": [
     "wordpress",

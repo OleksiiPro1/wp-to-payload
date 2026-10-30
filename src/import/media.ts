@@ -165,7 +165,7 @@ export class MediaSource {
       const response = await fetchImpl(url, {
         signal: AbortSignal.timeout(this.options.timeoutMs),
         redirect: 'manual',
-        headers: { 'user-agent': 'wp-to-payload (+https://github.com/oleksiipro1/wp-to-payload)' },
+        headers: { 'user-agent': 'wp-to-payload (+https://github.com/OleksiiPro1/wp-to-payload)' },
       })
       const location = response.headers.get('location')
       if (response.status < 300 || response.status >= 400 || !location || hop >= 5) return response

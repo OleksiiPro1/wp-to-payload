@@ -1,6 +1,6 @@
 # wp-to-payload
 
-[![CI](https://github.com/oleksiipro1/wp-to-payload/actions/workflows/ci.yml/badge.svg)](https://github.com/oleksiipro1/wp-to-payload/actions/workflows/ci.yml)
+[![CI](https://github.com/OleksiiPro1/wp-to-payload/actions/workflows/ci.yml/badge.svg)](https://github.com/OleksiiPro1/wp-to-payload/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 Move a WordPress site to [Payload CMS 3](https://payloadcms.com) from the standard WordPress

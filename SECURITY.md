@@ -3,7 +3,7 @@
 ## Reporting a vulnerability
 
 Please report vulnerabilities privately through
-[GitHub security advisories](https://github.com/oleksiipro1/wp-to-payload/security/advisories/new),
+[GitHub security advisories](https://github.com/OleksiiPro1/wp-to-payload/security/advisories/new),
 not in public issues. You will get an answer within a week.
 
 ## How wp-to-payload handles data
