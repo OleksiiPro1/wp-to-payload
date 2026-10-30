@@ -1,4 +1,7 @@
-/** Built-in import steps, in the order they run. Post types from the config add more steps. */
+/**
+ * Built-in import steps, in the order they run. Custom taxonomies add steps after the tags,
+ * custom post types after the pages.
+ */
 export const PHASES = [
   'media',
   'categories',
@@ -9,7 +12,7 @@ export const PHASES = [
   'redirects',
 ] as const
 
-/** A step name: a built-in step or the step of a post type (named after its collection). */
+/** A step name: a built-in step or the step of a custom type (named after its collection). */
 export type Phase = string
 
 const LABELS: Record<string, string> = {
