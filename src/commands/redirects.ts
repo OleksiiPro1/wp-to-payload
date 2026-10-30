@@ -2,6 +2,7 @@ import { mkdir, writeFile } from 'node:fs/promises'
 import { dirname, join, relative, resolve } from 'node:path'
 import {
   type Command,
+  type CommandContext,
   listOption,
   requireExportFile,
   stringOption,
@@ -28,7 +29,7 @@ export const redirectsCommand: Command = {
     ...PATH_HELP,
     [
       '--to-payload',
-      'Write the redirects into the Payload redirects plugin collection (see `import --help`)',
+      'Write into the @payloadcms/plugin-redirects collection of the Payload project here',
     ],
   ],
   options: {
@@ -39,9 +40,14 @@ export const redirectsCommand: Command = {
   },
   async run(ctx) {
     if (ctx.values['to-payload']) {
-      throw new UsageError(
-        'use `wp-to-payload import <export.xml> --only redirects` to write into Payload',
-      )
+      // Same as `import --only redirects`: runs in the Payload project and writes into the
+      // plugin's collection, pointing to the imported documents.
+      const { importCommand } = await import('./import.js')
+      const values: CommandContext['values'] = { ...ctx.values, only: ['redirects'] }
+      delete values.format
+      delete values.out
+      delete values['to-payload']
+      return importCommand.run({ ...ctx, values })
     }
     const file = resolve(ctx.cwd, requireExportFile(ctx))
     const formats = listOption(ctx, 'format')
