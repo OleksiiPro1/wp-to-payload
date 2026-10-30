@@ -1,5 +1,6 @@
 import { stat } from 'node:fs/promises'
 import { basename } from 'node:path'
+import { BUILDERS, type Builder, detectBuilders } from '../content/builders.js'
 import { BLOCK_OPENER, blockSupport, hasBlocks, normalizeBlockName } from '../content/blocks.js'
 import { scanShortcodes } from '../content/shortcodes-scan.js'
 import { mimeTypeOf } from '../util/mime.js'
@@ -11,18 +12,8 @@ import { INTERNAL_TYPES, siteUrlOf } from '../wxr/site-index.js'
 import { scoreComplexity } from './complexity.js'
 import type { AnalyzeReport, BlockUsage, Detection, NamedCount, StatusCounts } from './report.js'
 
-const BUILDER_KEYS = [
-  'elementor',
-  'divi',
-  'wpbakery',
-  'beaver',
-  'oxygen',
-  'bricks',
-  'avada',
-] as const
 const SEO_KEYS = ['yoast', 'rankmath', 'aioseo', 'seopress'] as const
 
-type Builder = (typeof BUILDER_KEYS)[number]
 type Seo = (typeof SEO_KEYS)[number]
 
 const WOO_TYPES = new Set([
@@ -46,27 +37,6 @@ const POLYLANG_TAXONOMIES = new Set([
   'term_language',
   'term_translations',
 ])
-
-const detectBuilders = (item: WxrItem): Builder[] => {
-  const found: Builder[] = []
-  const has = (key: string) => item.meta.has(key)
-  const c = item.content
-  if (has('_elementor_data') || metaValue(item, '_elementor_edit_mode') === 'builder') {
-    found.push('elementor')
-  }
-  if (c.includes('[et_pb_') || metaValue(item, '_et_pb_use_builder') === 'on') found.push('divi')
-  if (c.includes('[vc_row') || c.includes('[vc_column') || has('_wpb_vc_js_status')) {
-    found.push('wpbakery')
-  }
-  if (metaValue(item, '_fl_builder_enabled') === '1' || has('_fl_builder_data'))
-    found.push('beaver')
-  if (has('ct_builder_shortcodes') || has('_ct_builder_json') || has('ct_builder_json')) {
-    found.push('oxygen')
-  }
-  if (has('_bricks_page_content_2') || has('_bricks_editor_mode')) found.push('bricks')
-  if (c.includes('[fusion_builder_container') || c.includes('[fusion_')) found.push('avada')
-  return found
-}
 
 const detectSeo = (item: WxrItem): Seo[] => {
   const found = new Set<Seo>()
@@ -132,7 +102,7 @@ export const analyzeExport = async (file: string): Promise<AnalyzeReport> => {
   let emptyItems = 0
   let passwordProtected = 0
 
-  const builders = Object.fromEntries(BUILDER_KEYS.map((k) => [k, emptyDetection()])) as Record<
+  const builders = Object.fromEntries(BUILDERS.map((k) => [k, emptyDetection()])) as Record<
     Builder,
     Detection
   >
@@ -249,7 +219,7 @@ export const analyzeExport = async (file: string): Promise<AnalyzeReport> => {
 
   const finish = (d: Detection) => ({ ...d, detected: d.detected || d.items > 0 })
 
-  for (const key of BUILDER_KEYS) builders[key] = finish(builders[key])
+  for (const key of BUILDERS) builders[key] = finish(builders[key])
   for (const key of SEO_KEYS) {
     seo[key] = finish(seo[key])
     if (seo[key].detected) seo[key].details = { itemsWithTitle: seoWithTitle[key] }

@@ -24,6 +24,7 @@ const SUPPORTED = new Set([
   'core/group',
   'core/freeform',
   'core/html',
+  'core/shortcode',
 ])
 
 /** Converted with some loss (layout, styling or interactivity is not kept). */
@@ -36,7 +37,6 @@ const PARTIAL = new Set([
   'core/audio',
   'core/video',
   'core/file',
-  'core/shortcode',
   'core/footnotes',
   'core/row',
   'core/stack',

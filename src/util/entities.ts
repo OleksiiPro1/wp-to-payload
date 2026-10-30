@@ -5,7 +5,7 @@ const NAMED: Record<string, string> = {
   gt: '>',
   quot: '"',
   apos: "'",
-  nbsp: ' ',
+  nbsp: '\u00a0',
   ndash: '–',
   mdash: '—',
   lsquo: '‘',
