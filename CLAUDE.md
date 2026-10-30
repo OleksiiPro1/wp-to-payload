@@ -29,7 +29,19 @@ of Wien Webstudio, so quality and honesty about limits matter more than features
   `docs/warnings.md`. Do not drop content silently.
 - `analyze` and `import` share `src/content/blocks.ts`, so the report matches what the import
   does. Change both together.
-- Work on a branch, small logical commits with conventional messages. Do not push to `main`.
+- Work on a branch, small logical commits with conventional messages. `main` only changes
+  through pull requests; never push to it directly.
+- Releases: bump the version in a pull request, then push a `v*` tag on `main`;
+  `.github/workflows/publish.yml` publishes with npm trusted publishing (see CONTRIBUTING.md).
+
+## Decisions
+
+Settled with the maintainer; change them only after asking.
+
+- Internal links in content become plain URLs to the new paths, not Lexical links to documents.
+- Settings live in `wp-to-payload.config.json` (JSON, no loader); command-line flags override it.
+- Comments are counted in reports, not imported.
+- Author e-mail addresses are imported only when `importAuthorEmails` is set.
 
 ## Commits
 
