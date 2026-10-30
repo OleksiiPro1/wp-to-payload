@@ -1,5 +1,6 @@
 import type { Config } from './config.js'
 import type { PathPatterns } from './paths/patterns.js'
+import type { SiteUrlsOptions, TermArchive } from './paths/site-urls.js'
 import type { WxrItemTerm, WxrTerm } from './wxr/model.js'
 import { INTERNAL_TYPES, type SiteIndex } from './wxr/site-index.js'
 
@@ -258,15 +259,6 @@ export interface SkippedType {
   reason: string
 }
 
-/** Term archives of a custom taxonomy that get a new URL. */
-export interface TermArchive {
-  taxonomy: string
-  /** Path before the term on the old site, without slashes at the ends. */
-  base: string
-  /** New path pattern (`:slug`, `:path`). */
-  pattern: string
-}
-
 export interface SiteTypes {
   /** In import order: posts, pages, then custom post types by name. */
   postTypes: PostTypeTarget[]
@@ -460,3 +452,10 @@ export const resolveSiteTypes = (config: Config, survey: TypeSurvey): SiteTypes 
   }
   return { postTypes, taxonomies, skipped, patterns, archives }
 }
+
+/** Options for `SiteUrls` that match the resolved types, so links and redirects agree. */
+export const siteUrlsOptions = (config: Config, types: SiteTypes): SiteUrlsOptions => ({
+  patterns: types.patterns,
+  extraHosts: config.siteHosts,
+  archives: types.archives,
+})

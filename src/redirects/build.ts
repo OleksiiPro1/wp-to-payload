@@ -9,7 +9,8 @@ export interface Redirect {
   /** New path (percent-encoded). */
   to: string
   status: 301
-  kind: 'permalink' | 'old-slug' | 'category' | 'tag'
+  /** `term` is an archive of a custom taxonomy. */
+  kind: 'permalink' | 'old-slug' | 'category' | 'tag' | 'term'
   wpId?: number
   wpType?: string
 }
@@ -25,9 +26,9 @@ const PROTECTED = /^\/(wp-admin|wp-login\.php|wp-json|xmlrpc\.php|admin|api|_nex
 const encodeOld = (path: string): string => encodePath(path).replace(/%2F/gi, '/')
 
 /**
- * Old URL → new URL for every published post and page whose type has a path pattern, for
- * earlier slugs, and for category and tag archives when their patterns are set. Conflicts are
- * reported and left out rather than guessed.
+ * Old URL → new URL for every published item whose type has a path pattern, for earlier slugs,
+ * and for term archives whose taxonomy has one (categories, tags, custom taxonomies). Conflicts
+ * are reported and left out rather than guessed.
  */
 export const buildRedirects = (index: SiteIndex, urls: SiteUrls): RedirectMap => {
   const warnings: Warning[] = []
@@ -102,32 +103,19 @@ export const buildRedirects = (index: SiteIndex, urls: SiteUrls): RedirectMap =>
 
   const sitePath = new URL(`${urls.siteUrl}/`).pathname.replace(/\/$/, '')
   for (const term of index.terms) {
-    if (term.taxonomy !== 'category' && term.taxonomy !== 'post_tag') continue
-    const target = urls.termPath(term.taxonomy, term.slug)
-    if (target === undefined) continue
-    const base = term.taxonomy === 'category' ? 'category' : 'tag'
-    const oldSlug = term.taxonomy === 'category' ? categoryPath(index, term.slug) : term.slug
+    const archive = urls.archives.find((a) => a.taxonomy === term.taxonomy)
+    const target = archive ? urls.termPath(term.taxonomy, term.slug) : undefined
+    if (!archive || target === undefined) continue
+    const oldSlug = archive.nested ? urls.termTree(term.taxonomy, term.slug) : term.slug
     add({
-      from: encodeOld(`${sitePath}/${base}/${oldSlug}/`),
+      from: encodeOld(`${sitePath}/${archive.base}/${oldSlug}/`),
       to: encodePath(target),
       status: 301,
-      kind: term.taxonomy === 'category' ? 'category' : 'tag',
+      kind:
+        term.taxonomy === 'category' ? 'category' : term.taxonomy === 'post_tag' ? 'tag' : 'term',
     })
   }
 
   const redirects = [...byFrom.values()].sort((a, b) => a.from.localeCompare(b.from))
   return { redirects, warnings }
-}
-
-const categoryPath = (index: SiteIndex, slug: string): string => {
-  const bySlug = new Map(
-    index.terms.filter((t) => t.taxonomy === 'category').map((t) => [t.slug, t]),
-  )
-  const slugs = [slug]
-  let parent = bySlug.get(slug)?.parentSlug
-  while (parent && !slugs.includes(parent)) {
-    slugs.unshift(parent)
-    parent = bySlug.get(parent)?.parentSlug
-  }
-  return slugs.join('/')
 }

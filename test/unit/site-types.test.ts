@@ -1,14 +1,17 @@
 import { fileURLToPath } from 'node:url'
 import { beforeAll, describe, expect, it } from 'vitest'
 import { DEFAULT_CONFIG, parseConfig } from '../../src/config.js'
+import { SiteUrls } from '../../src/paths/site-urls.js'
+import { buildRedirects } from '../../src/redirects/build.js'
 import {
   camelCase,
   defaultCollectionSlug,
   resolveSiteTypes,
+  siteUrlsOptions,
   surveyIndex,
   type TypeSurvey,
 } from '../../src/site-types.js'
-import { buildSiteIndex } from '../../src/wxr/site-index.js'
+import { buildSiteIndex, type SiteIndex } from '../../src/wxr/site-index.js'
 import { fixture } from '../helpers.js'
 
 const core = fileURLToPath(new URL('../fixtures/wxr/wordpress/core.xml', import.meta.url))
@@ -111,6 +114,63 @@ describe('site types of the core export', () => {
         base: 'rezeptkategorie',
         pattern: '/rezepte/kategorie/:path',
       },
+    ])
+  })
+})
+
+describe('URLs of custom post types and taxonomies', () => {
+  let index: SiteIndex
+  beforeAll(async () => {
+    index = await buildSiteIndex(core)
+  })
+  const urlsFor = (raw: unknown) => {
+    const config = parseConfig(raw)
+    return new SiteUrls(
+      index,
+      siteUrlsOptions(config, resolveSiteTypes(config, surveyIndex(index))),
+    )
+  }
+
+  it('rewrites links to custom post types and, when configured, to term archives', () => {
+    const plain = urlsFor({})
+    expect(plain.rewriteHref('https://core.example.com/rezepte/roggenbrot/')).toBe(
+      '/recipes/roggenbrot',
+    )
+    expect(plain.rewriteHref('https://core.example.com/ratgeber/mehlsorten/roggenmehl/')).toBe(
+      '/guides/mehlsorten/roggenmehl',
+    )
+    // Without a pattern for its archives, a link to a term stays as it is.
+    expect(plain.rewriteHref('https://core.example.com/rezeptkategorie/suesses/')).toBeUndefined()
+
+    const configured = urlsFor({
+      taxonomies: {
+        recipe_category: { base: 'rezeptkategorie', path: '/rezepte/kategorie/:path' },
+      },
+    })
+    expect(configured.rewriteHref('https://core.example.com/rezeptkategorie/sauerteigbrot/')).toBe(
+      '/rezepte/kategorie/brot/sauerteigbrot',
+    )
+  })
+
+  it('redirects custom post types and term archives', () => {
+    const urls = urlsFor({
+      paths: { post: '/blog/:slug' },
+      taxonomies: { recipe_category: { base: 'rezeptkategorie', path: '/rezepte/:slug' } },
+    })
+    const { redirects, warnings } = buildRedirects(index, urls)
+    expect(warnings).toEqual([])
+    expect(
+      redirects
+        .filter((r) => r.wpType !== 'post' && r.wpType !== 'page')
+        .map((r) => `${r.kind} ${r.from} -> ${r.to}`),
+    ).toEqual([
+      'permalink /ratgeber/mehlsorten/ -> /guides/mehlsorten',
+      'permalink /ratgeber/mehlsorten/roggenmehl/ -> /guides/mehlsorten/roggenmehl',
+      'permalink /rezepte/roggenbrot/ -> /recipes/roggenbrot',
+      'permalink /rezepte/zimtschnecken/ -> /recipes/zimtschnecken',
+      'term /rezeptkategorie/brot/ -> /rezepte/brot',
+      'term /rezeptkategorie/sauerteigbrot/ -> /rezepte/sauerteigbrot',
+      'term /rezeptkategorie/suesses/ -> /rezepte/suesses',
     ])
   })
 })
