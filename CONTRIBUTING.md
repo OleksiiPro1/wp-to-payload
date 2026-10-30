@@ -5,7 +5,8 @@ useful contribution of all; please make up the content (see [Test data](#test-da
 
 ## Setup
 
-You need Node.js 22.12 or newer (24 for the integration tests is fine too).
+You need Node.js 22.22.2+, 24.15+ or 26+, the versions jsdom supports. The integration tests
+need what Payload 3.92 needs: 22.23.4+ or 24.22.1+.
 
 ```bash
 npm ci
@@ -26,8 +27,9 @@ npm run test:integration   # temporary Payload projects on SQLite; needs the bui
 npm run test:external      # WordPress Theme Unit Test data, downloaded at run time
 ```
 
-Run lint, typecheck and the unit tests before every push; CI runs all of them and the
-integration tests on Node 22 and 24. `npm run format` fixes formatting.
+Run lint, typecheck and the unit tests before every push. CI runs the unit tests on the
+lowest supported versions (22.22.2 and 24.15.0) and the latest Node 22, 24 and 26, and the
+integration tests on the latest Node 22 and 24. `npm run format` fixes formatting.
 
 ## Project layout
 

@@ -15,8 +15,9 @@ of Wien Webstudio, so quality and honesty about limits matter more than features
   are synthetic (`example.com`, made-up people).
 - No GPL code or data: do not copy WordPress code (block parser, wpautop, shortcode regexes)
   or Theme Unit Test files. The external test downloads that data at run time only.
-- Node.js 22.12+, TypeScript strict, ESM. Runtime dependencies are only `sax` and `jsdom`;
-  ask before adding one. CLI parsing, colours and HTTP use Node built-ins.
+- Node.js `^22.22.2 || ^24.15.0 || >=26.0.0`, what jsdom 30 needs (`engines` must match the
+  strictest runtime dependency). TypeScript strict, ESM. Runtime dependencies are only `sax`
+  and `jsdom`; ask before adding one. CLI parsing, colours and HTTP use Node built-ins.
 - `payload` and `@payloadcms/richtext-lexical` are never imported by this package's own module
   graph: `src/import/project.ts` resolves them from the user's project, so the project's
   Payload instance is used. Types for them are structural (`src/import/payload-types.ts`).

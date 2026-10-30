@@ -44,7 +44,9 @@ writing anything.
 
 ## Requirements
 
-- Node.js 22.12 or newer. Payload 3.92 itself needs Node.js 22.23.4+ or 24.22.1+.
+- Node.js 22.22.2 or newer on Node 22, 24.15 or newer on Node 24, or Node 26 and later: what
+  jsdom, which the import uses to clean up HTML, supports. Payload 3.92 itself needs Node.js
+  22.23.4+ or 24.22.1+.
 - A Payload 3 project with `payload` and `@payloadcms/richtext-lexical` installed, set up as
   ES modules (`"type": "module"` in `package.json`, as `create-payload-app` does it).
   `analyze` and `redirects` work without one.

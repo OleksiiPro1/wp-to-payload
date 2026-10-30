@@ -11,6 +11,12 @@ All notable changes to this project are documented here. The format follows
 - Term meta (`wp:termmeta`) is read from exports, and a reader for PHP `serialize()` data
   handles plugin data such as Polylang translations and ACF settings. Groundwork for 0.2.
 
+### Changed
+
+- The required Node.js version is now what the dependencies need: 22.22.2 or newer on Node 22,
+  24.15 or newer on Node 24, or Node 26 and later (jsdom 30). `engines` said 22.12, so npm
+  warned about jsdom and its dependencies (`EBADENGINE`) on earlier Node 22 releases.
+
 ### Development
 
 - Test fixtures from real WordPress 7.1 sites, built in Docker by `scripts/fixtures` and
