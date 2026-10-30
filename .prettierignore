@@ -4,3 +4,5 @@ coverage/
 package-lock.json
 test/fixtures/
 test/golden/
+test/payload-project/.runs/
+test/payload-project/package-lock.json

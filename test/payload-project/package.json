@@ -1,0 +1,16 @@
+{
+  "name": "wp-to-payload-test-project",
+  "private": true,
+  "description": "Minimal Payload 3 project for the wp-to-payload integration tests.",
+  "type": "module",
+  "dependencies": {
+    "@payloadcms/db-sqlite": "3.92.1",
+    "@payloadcms/plugin-redirects": "3.92.1",
+    "@payloadcms/plugin-seo": "3.92.1",
+    "@payloadcms/richtext-lexical": "3.92.1",
+    "graphql": "^16.11.0",
+    "payload": "3.92.1",
+    "react": "^19.2.1",
+    "react-dom": "^19.2.1"
+  }
+}
