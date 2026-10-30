@@ -514,7 +514,7 @@ export const importExport = async (
         warnings
           .for({ wpId: post.id, wpType: 'post' })
           .add(
-            'REFERENCE_MISSING',
+            'SLUG_CHANGED',
             `Slug "${post.slug}" is also used by post ${other}; this post got "${post.slug}-${post.id}".`,
             post.slug,
           )
@@ -536,7 +536,7 @@ export const importExport = async (
     const published = item.status === 'publish' && !item.hasPassword
     if (item.hasPassword) {
       itemWarnings.add(
-        'ELEMENT_REMOVED',
+        'PASSWORD_PROTECTED',
         'The item was password protected; it was imported as a draft.',
         'password',
       )
