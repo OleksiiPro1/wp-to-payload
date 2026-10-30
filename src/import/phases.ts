@@ -22,6 +22,8 @@ const LABELS: Record<string, string> = {
   redirects: 'Redirects',
 }
 
-/** Name of a step for the console and reports. */
-export const phaseLabel = (phase: Phase): string =>
-  LABELS[phase] ?? phase.charAt(0).toUpperCase() + phase.slice(1)
+/** Name of a step for the console and reports: `recipe-categories` → `Recipe categories`. */
+export const phaseLabel = (phase: Phase): string => {
+  const words = phase.replace(/[-_]+/g, ' ').trim()
+  return LABELS[phase] ?? words.charAt(0).toUpperCase() + words.slice(1)
+}

@@ -19,6 +19,8 @@ export type WarningCode =
   | 'SLUG_CHANGED'
   | 'PASSWORD_PROTECTED'
   | 'FIELD_MISSING'
+  | 'COLLECTION_MISSING'
+  | 'TYPE_SKIPPED'
   | 'REDIRECT_CONFLICT'
   | 'XML_ERROR'
 
