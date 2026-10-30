@@ -419,8 +419,12 @@ export const resolveSiteTypes = (config: Config, survey: TypeSurvey): SiteTypes 
     }
     const collection = settings?.collection ?? allocate(name)
     let field = settings?.field ?? camelCase(defaultCollectionSlug(name))
-    if (!settings?.field && reservedFields.has(field))
-      field = `wp${field[0]?.toUpperCase()}${field.slice(1)}`
+    if (!settings?.field && reservedFields.has(field)) {
+      const base = `wp${field[0]?.toUpperCase()}${field.slice(1)}`
+      field = base
+      for (let n = 2; reservedFields.has(field); n++) field = `${base}${n}`
+    }
+    reservedFields.add(field)
     taxonomies.push({
       taxonomy: name,
       phase: phaseFor(collection, name),
