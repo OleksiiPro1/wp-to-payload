@@ -12,7 +12,7 @@ import {
   stringOption,
   UsageError,
 } from '../cli/command.js'
-import { fail, info, out } from '../cli/output.js'
+import { fail, info, out, warn } from '../cli/output.js'
 import { configFromOptions, PATH_HELP, PATH_OPTIONS } from '../cli/shared.js'
 import { type Phase, PHASES } from '../import/phases.js'
 import { findPackageDir } from '../import/project.js'
@@ -72,6 +72,21 @@ export const importCommand: Command = {
     if (!payloadDir) {
       fail('Payload is not installed here. Run this command in the root of your Payload 3 project.')
       return 2
+    }
+    // Payload 3 projects are ES modules. Without "type": "module", tsx compiles the config as
+    // CommonJS and Payload gets loaded twice, which fails with obscure errors.
+    const projectPackage = join(ctx.cwd, 'package.json')
+    if (existsSync(projectPackage)) {
+      try {
+        const pkg = JSON.parse(await readFile(projectPackage, 'utf8')) as { type?: string }
+        if (pkg.type !== 'module') {
+          warn(
+            'package.json has no "type": "module". Payload 3 projects are ES modules; add it if the import fails.',
+          )
+        }
+      } catch {
+        // An unreadable package.json is Payload's problem to report.
+      }
     }
     const runner = fileURLToPath(new URL('../import/runner.js', import.meta.url))
     const temp = await mkdtemp(join(tmpdir(), 'wp-to-payload-'))

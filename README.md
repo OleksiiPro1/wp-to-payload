@@ -45,7 +45,8 @@ writing anything.
 ## Requirements
 
 - Node.js 22.12 or newer. Payload 3.92 itself needs Node.js 22.23.4+ or 24.22.1+.
-- A Payload 3 project with `payload` and `@payloadcms/richtext-lexical` installed.
+- A Payload 3 project with `payload` and `@payloadcms/richtext-lexical` installed, set up as
+  ES modules (`"type": "module"` in `package.json`, as `create-payload-app` does it).
   `analyze` and `redirects` work without one.
 - A WordPress export file (WXR). Files of hundreds of megabytes are fine: the export is
   streamed, never loaded into memory as a whole.

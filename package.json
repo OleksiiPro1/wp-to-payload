@@ -1,6 +1,6 @@
 {
   "name": "wp-to-payload",
-  "version": "0.1.0-dev",
+  "version": "0.1.0",
   "description": "Migrate WordPress sites to Payload CMS 3 from a WXR export file: analyze, scaffold, import and redirects.",
   "license": "MIT",
   "author": "Oleksii Piltenko, Wien Webstudio (https://wienwebstudio.at)",
@@ -18,7 +18,7 @@
   "types": "./dist/index.d.ts",
   "files": [
     "dist",
-    "!dist/**/*.test.*"
+    "CHANGELOG.md"
   ],
   "engines": {
     "node": ">=22.12.0"
