@@ -44,9 +44,8 @@ session's default attribution settings.
   git config user.email "info@wienwebstudio.at"
   ```
 
-- End every commit message with a `Co-Authored-By: Claude …` trailer, as the assistant session
-  provides it.
-- Never add a `Claude-Session: …` trailer or any other link to a session.
+- No `Co-Authored-By: …` and no `Claude-Session: …` lines in commit messages, and no other
+  links to an assistant session. Messages are a conventional subject and, if needed, a body.
 - Check before pushing: `git log --format='%an <%ae> | %cn <%ce>' -1`.
 
 ## Commands
