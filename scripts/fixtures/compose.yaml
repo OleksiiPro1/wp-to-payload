@@ -1,0 +1,57 @@
+# Disposable WordPress site for generating test fixtures; see "WordPress fixtures" in
+# CONTRIBUTING.md. Images are pinned so exports stay comparable between runs.
+name: wp2p-fixtures
+
+x-db-env: &db-env
+  WORDPRESS_DB_HOST: db
+  WORDPRESS_DB_USER: wordpress
+  WORDPRESS_DB_PASSWORD: wordpress
+  WORDPRESS_DB_NAME: wordpress
+
+services:
+  db:
+    image: ${WP2P_REGISTRY:-docker.io/library}/mariadb:12.3.3
+    environment:
+      MARIADB_DATABASE: wordpress
+      MARIADB_USER: wordpress
+      MARIADB_PASSWORD: wordpress
+      MARIADB_RANDOM_ROOT_PASSWORD: '1'
+    tmpfs:
+      - /var/lib/mysql
+    healthcheck:
+      test: ['CMD', 'healthcheck.sh', '--connect', '--innodb_initialized']
+      interval: 2s
+      timeout: 5s
+      retries: 60
+
+  wordpress:
+    image: ${WP2P_REGISTRY:-docker.io/library}/wordpress:7.1.4-php8.3-apache
+    depends_on:
+      db:
+        condition: service_healthy
+    environment: *db-env
+    volumes:
+      - site:/var/www/html
+      - ./mu-plugins:/var/www/html/wp-content/mu-plugins:ro
+    healthcheck:
+      # The image writes wp-config.php when it starts.
+      test: ['CMD', 'test', '-f', '/var/www/html/wp-config.php']
+      interval: 1s
+      timeout: 5s
+      retries: 120
+
+  cli:
+    image: ${WP2P_REGISTRY:-docker.io/library}/wordpress:cli-2.12.0-php8.3
+    # Same user as the web server in the wordpress image, so both can write uploads.
+    user: '33:33'
+    profiles: [cli]
+    entrypoint: [wp]
+    environment: *db-env
+    volumes:
+      - site:/var/www/html
+      - ./mu-plugins:/var/www/html/wp-content/mu-plugins:ro
+      - .:/fixtures:ro
+      - ./out:/out
+
+volumes:
+  site:
