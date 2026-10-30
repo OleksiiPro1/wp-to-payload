@@ -45,6 +45,7 @@ src/
   import/     the import: runner (inside `payload run`), schema checks, media, Lexical
   commands/   one file per CLI command
   util/       entities, slugs, MIME types, PHP serialize() reader
+  site-types.ts  which post types and taxonomies are imported, into which collections
 scripts/
   fixtures/   builds WordPress sites in Docker and exports them as fixtures
 test/
@@ -109,7 +110,7 @@ require __DIR__ . '/../lib/fixtures.php';
 
 The helpers in `scripts/fixtures/lib/fixtures.php` create posts, terms, users, images and menu
 items with fixed dates. `scripts/fixtures/mu-plugins/` holds our own small plugins for the
-test sites, such as the custom post type of the `core` scenario.
+test sites, such as the custom post types of the `core` scenario.
 
 - Content is synthetic, like all fixtures: made-up names and texts, `example.com` addresses.
   The admin password is random, and exports contain no user passwords.
