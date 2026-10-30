@@ -1,0 +1,16 @@
+node_modules/
+dist/
+coverage/
+.tmp/
+*.log
+.env
+.env.*
+!.env.example
+# Reports and outputs from local runs
+wp-to-payload-report/
+report.json
+report.md
+# Never commit real exports or uploads
+*.wordpress.xml
+*.wordpress.*.xml
+wp-content/
