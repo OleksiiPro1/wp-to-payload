@@ -37,7 +37,10 @@ All notable changes to this project are documented here. The format follows
 ### Development
 
 - Test fixtures from real WordPress 7.1 sites, built in Docker by `scripts/fixtures` and
-  exported with both WordPress's exporter and WP-CLI.
+  exported with both WordPress's exporter and WP-CLI. The `core` site has a custom post type
+  with a hierarchical taxonomy and a hierarchical custom post type.
+- CI runs the unit tests on the lowest supported Node.js versions too, and installs the packed
+  package there without engine warnings.
 - Tests of the Payload features the import relies on (hasMany numbers, localized fields).
 
 ## [0.1.0] - Unreleased
