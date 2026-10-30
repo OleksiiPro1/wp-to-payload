@@ -15,8 +15,9 @@ of Wien Webstudio, so quality and honesty about limits matter more than features
   are synthetic (`example.com`, made-up people).
 - No GPL code or data: do not copy WordPress code (block parser, wpautop, shortcode regexes)
   or Theme Unit Test files. The external test downloads that data at run time only.
-- Node.js 22.12+, TypeScript strict, ESM. Runtime dependencies are only `sax` and `jsdom`;
-  ask before adding one. CLI parsing, colours and HTTP use Node built-ins.
+- Node.js `^22.22.2 || ^24.15.0 || >=26.0.0`, what jsdom 30 needs (`engines` must match the
+  strictest runtime dependency). TypeScript strict, ESM. Runtime dependencies are only `sax`
+  and `jsdom`; ask before adding one. CLI parsing, colours and HTTP use Node built-ins.
 - `payload` and `@payloadcms/richtext-lexical` are never imported by this package's own module
   graph: `src/import/project.ts` resolves them from the user's project, so the project's
   Payload instance is used. Types for them are structural (`src/import/payload-types.ts`).
@@ -29,6 +30,8 @@ of Wien Webstudio, so quality and honesty about limits matter more than features
   `docs/warnings.md`. Do not drop content silently.
 - `analyze` and `import` share `src/content/blocks.ts`, so the report matches what the import
   does. Change both together.
+- Which post types and taxonomies are imported, their collections and default URLs are decided
+  in `src/site-types.ts` alone; `analyze`, `scaffold`, `import` and `redirects` all use it.
 - Work on a branch, small logical commits with conventional messages. `main` only changes
   through pull requests; never push to it directly.
 - Releases: bump the version in a pull request, then push a `v*` tag on `main`;
@@ -42,6 +45,20 @@ Settled with the maintainer; change them only after asking.
 - Settings live in `wp-to-payload.config.json` (JSON, no loader); command-line flags override it.
 - Comments are counted in reports, not imported.
 - Author e-mail addresses are imported only when `importAuthorEmails` is set.
+- ACF fields go to the top level of a collection (`post.price`). When a name clashes with an
+  existing field, the ACF field is renamed and a warning with a code is reported.
+- The default language has no URL prefix (`/ueber-uns`, `/en/about-us`); the config can
+  change that.
+- WPML support is tested only against its documented export keys and is marked experimental.
+- Fixtures with plugin data are exports of real WordPress sites built by `scripts/fixtures`
+  (Docker): only our synthetic content goes into the repository, never plugin code.
+- Version 0.2 is delivered stage by stage, one pull request per stage.
+
+## Pull requests
+
+- One pull request per stage or topic, into `main`, merged once CI is green.
+- The description says what changed and how it was tested. No "Generated with Claude Code"
+  line and no links to an assistant session.
 
 ## Commits
 

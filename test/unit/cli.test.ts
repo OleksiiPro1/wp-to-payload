@@ -64,9 +64,10 @@ describe('cli commands', () => {
       dir,
     ])
     expect(code).toBe(0)
-    expect(readFileSync(join(dir, 'redirects.csv'), 'utf8')).toContain(
-      '/2024/02/01/bakery-news/,/blog/bakery-news,301',
-    )
+    const csv = readFileSync(join(dir, 'redirects.csv'), 'utf8')
+    expect(csv).toContain('/2024/02/01/bakery-news/,/blog/bakery-news,301')
+    // A custom post type gets a default path.
+    expect(csv).toContain('/recipe/rye-bread/,/recipes/rye-bread,301')
     expect(readFileSync(join(dir, '_redirects'), 'utf8')).toContain('/blog/bakery-news 301')
   })
 

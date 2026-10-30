@@ -22,20 +22,39 @@ export const normalizePath = (path: string): string => {
 
 const stripWww = (host: string): string => host.toLowerCase().replace(/^www\./, '')
 
+/** Term archives with a new URL: `/<base>/<term>/` on the old site, `pattern` on the new one. */
+export interface TermArchive {
+  taxonomy: string
+  /** Path before the term on the old site, without slashes at the ends (`category`). */
+  base: string
+  /** New path pattern (`:slug`, `:path`). */
+  pattern: string
+  /** Old URLs contain the parent terms (`/category/rezepte/brot/`), as for categories. */
+  nested?: boolean
+}
+
 export interface SiteUrlsOptions {
   patterns?: PathPatterns
   /** More hostnames that count as the old site (for example a staging domain). */
   extraHosts?: string[]
+  /**
+   * Archives of custom taxonomies with a new URL. Category and tag archives come from
+   * `patterns.category` and `patterns.tag`.
+   */
+  archives?: TermArchive[]
 }
 
 /** Old and new URLs of everything in an export. */
 export class SiteUrls {
   readonly siteUrl: string
   readonly patterns: PathPatterns
+  /** Every taxonomy whose archives get a new URL, the longest old base first. */
+  readonly archives: Required<TermArchive>[]
   private readonly hosts: Set<string>
   private readonly sitePath: string
   private readonly byOldPath = new Map<string, number>()
-  private readonly categories = new Map<string, WxrTerm>()
+  /** Terms by taxonomy and slug, for paths with parent terms. */
+  private readonly terms = new Map<string, Map<string, WxrTerm>>()
   private readonly newPaths = new Map<number, string | undefined>()
 
   constructor(
@@ -43,6 +62,21 @@ export class SiteUrls {
     options: SiteUrlsOptions = {},
   ) {
     this.patterns = { ...DEFAULT_PATTERNS, ...options.patterns }
+    const builtin: TermArchive[] = []
+    if (this.patterns.category) {
+      builtin.push({
+        taxonomy: 'category',
+        base: 'category',
+        pattern: this.patterns.category,
+        nested: true,
+      })
+    }
+    if (this.patterns.tag) {
+      builtin.push({ taxonomy: 'post_tag', base: 'tag', pattern: this.patterns.tag })
+    }
+    this.archives = [...builtin, ...(options.archives ?? [])]
+      .map((a) => ({ ...a, base: a.base.replace(/^\/+|\/+$/g, ''), nested: a.nested ?? false }))
+      .sort((a, b) => b.base.length - a.base.length)
     this.siteUrl = siteUrlOf(index.site)
     const site = safeUrl(this.siteUrl)
     this.sitePath = site ? site.pathname.replace(/\/+$/, '') : ''
@@ -53,7 +87,9 @@ export class SiteUrls {
         .map(stripWww),
     )
     for (const term of index.terms) {
-      if (term.taxonomy === 'category') this.categories.set(term.slug, term)
+      const bySlug = this.terms.get(term.taxonomy) ?? new Map<string, WxrTerm>()
+      this.terms.set(term.taxonomy, bySlug)
+      bySlug.set(term.slug, term)
     }
     for (const post of index.posts.values()) {
       for (const path of this.oldPaths(post)) {
@@ -94,12 +130,25 @@ export class SiteUrls {
     return path
   }
 
-  /** New path of a category or tag archive, when a pattern for it is configured. */
-  termPath(taxonomy: 'category' | 'post_tag', slug: string): string | undefined {
-    const pattern = this.patterns[taxonomy === 'category' ? 'category' : 'tag']
-    if (!pattern) return undefined
-    const path = taxonomy === 'category' ? this.categoryPath(slug) : slug
-    return fillPattern(pattern, { slug, path })
+  /** New path of a term archive, when its taxonomy has a pattern. */
+  termPath(taxonomy: string, slug: string): string | undefined {
+    const archive = this.archives.find((a) => a.taxonomy === taxonomy)
+    if (!archive) return undefined
+    return fillPattern(archive.pattern, { slug, path: this.termTree(taxonomy, slug) })
+  }
+
+  /** The term's slug after the slugs of its parents, joined with `/` (`rezepte/brot`). */
+  termTree(taxonomy: string, slug: string): string {
+    const bySlug = this.terms.get(taxonomy)
+    const slugs = [slug]
+    const seen = new Set(slugs)
+    let parent = bySlug?.get(slug)?.parentSlug
+    while (parent && !seen.has(parent)) {
+      seen.add(parent)
+      slugs.unshift(parent)
+      parent = bySlug?.get(parent)?.parentSlug
+    }
+    return slugs.join('/')
   }
 
   /** The post an old URL points to: its permalink, an earlier slug, `?p=` or `?page_id=`. */
@@ -122,12 +171,15 @@ export class SiteUrls {
     const postId = this.findPost(href)
     let path = postId === undefined ? undefined : this.newPath(postId)
     if (path === undefined) {
-      const rel = url.pathname.slice(this.sitePath.length)
-      const archive = /^\/(category|tag)\/(.+?)\/?$/.exec(rel)
-      if (archive) {
-        const slug = decodeSafe(archive[2]?.split('/').pop() ?? '')
-        path = this.termPath(archive[1] === 'category' ? 'category' : 'post_tag', slug)
-      }
+      const rel = decodeSafe(url.pathname.slice(this.sitePath.length)).replace(/\/+$/, '')
+      const archive = this.archives.find((a) => rel.startsWith(`/${a.base}/`))
+      const slug = archive
+        ? rel
+            .slice(archive.base.length + 2)
+            .split('/')
+            .pop()
+        : undefined
+      if (archive && slug) path = this.termPath(archive.taxonomy, slug)
     }
     return path === undefined ? undefined : `${path}${url.hash}`
   }
@@ -143,7 +195,7 @@ export class SiteUrls {
       year,
       month,
       day,
-      category: category ? this.categoryPath(category.slug) : 'uncategorized',
+      category: category ? this.termTree('category', category.slug) : 'uncategorized',
       type: post.type,
     }
   }
@@ -156,18 +208,6 @@ export class SiteUrls {
       seen.add(parent.id)
       slugs.unshift(parent.slug)
       parent = this.index.posts.get(parent.parentId)
-    }
-    return slugs.join('/')
-  }
-
-  private categoryPath(slug: string): string {
-    const slugs = [slug]
-    const seen = new Set(slugs)
-    let parent = this.categories.get(slug)?.parentSlug
-    while (parent && !seen.has(parent)) {
-      seen.add(parent)
-      slugs.unshift(parent)
-      parent = this.categories.get(parent)?.parentSlug
     }
     return slugs.join('/')
   }

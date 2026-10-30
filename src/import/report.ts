@@ -3,17 +3,7 @@ import { join } from 'node:path'
 import { summarizeWarnings } from '../report/warnings.js'
 import { VERSION } from '../version.js'
 import type { ImportResult } from './importer.js'
-import { PHASES } from './phases.js'
-
-const LABELS = {
-  media: 'Media',
-  categories: 'Categories',
-  tags: 'Tags',
-  authors: 'Authors',
-  posts: 'Posts',
-  pages: 'Pages',
-  redirects: 'Redirects',
-} as const
+import { phaseLabel } from './phases.js'
 
 export const summaryLines = (result: ImportResult): string[] => {
   const lines: string[] = []
@@ -22,9 +12,9 @@ export const summaryLines = (result: ImportResult): string[] => {
       ? 'Dry run: nothing was written. This is what an import would do:'
       : 'Import finished:',
   )
-  const width = Math.max(...Object.values(LABELS).map((l) => l.length))
-  for (const phase of PHASES) {
-    const s = result.phases[phase]
+  const phases = Object.entries(result.phases)
+  const width = Math.max(10, ...phases.map(([phase]) => phaseLabel(phase).length))
+  for (const [phase, s] of phases) {
     if (s.created + s.updated + s.skipped + s.failed === 0) continue
     const parts = [
       `${s.created} ${result.dryRun ? 'to create' : 'created'}`,
@@ -32,7 +22,7 @@ export const summaryLines = (result: ImportResult): string[] => {
     ]
     if (s.skipped > 0) parts.push(`${s.skipped} skipped`)
     if (s.failed > 0) parts.push(`${s.failed} failed`)
-    lines.push(`  ${LABELS[phase].padEnd(width)}  ${parts.join(', ')}`)
+    lines.push(`  ${phaseLabel(phase).padEnd(width)}  ${parts.join(', ')}`)
   }
   const summary = summarizeWarnings(result.warnings)
   if (summary.length > 0) {
@@ -62,9 +52,10 @@ const markdown = (result: ImportResult): string => {
     '| Collection | Created | Updated | Skipped | Failed |',
     '| --- | --- | --- | --- | --- |',
   )
-  for (const phase of PHASES) {
-    const s = result.phases[phase]
-    lines.push(`| ${LABELS[phase]} | ${s.created} | ${s.updated} | ${s.skipped} | ${s.failed} |`)
+  for (const [phase, s] of Object.entries(result.phases)) {
+    lines.push(
+      `| ${phaseLabel(phase)} | ${s.created} | ${s.updated} | ${s.skipped} | ${s.failed} |`,
+    )
   }
   if (result.errors.length > 0) {
     lines.push('', '## Errors', '')

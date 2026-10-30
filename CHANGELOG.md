@@ -4,6 +4,45 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+
+- Custom post types and custom taxonomies. `analyze` lists them with what the import does with
+  each. `scaffold export.xml` writes a collection for each (`recipe` → `recipes`,
+  `recipe_category` → `recipe-categories`) with the fields of posts or categories, a parent for
+  hierarchical ones and relationship fields for the taxonomies. `import` brings them over like
+  posts and pages, and links and redirects use their new URLs (`/recipes/:slug` by default).
+  Archives of custom taxonomies are redirected when their new path is configured.
+- `postTypes` and `taxonomies` in the config file: collection, path, hierarchy, and for
+  taxonomies the old archive base and the relationship field.
+- Post types of plugins (form definitions and entries, page builder templates, ACF settings,
+  WooCommerce) are recognised and never imported; naming one under `postTypes` imports it.
+- Warning codes `COLLECTION_MISSING` (a step's collection does not exist) and `TYPE_SKIPPED`
+  (items of a plugin's post type).
+- Term meta (`wp:termmeta`) is read from exports, and a reader for PHP `serialize()` data
+  handles plugin data such as Polylang translations and ACF settings. Groundwork for 0.2.
+
+### Changed
+
+- The required Node.js version is now what the dependencies need: 22.22.2 or newer on Node 22,
+  24.15 or newer on Node 24, or Node 26 and later (jsdom 30). `engines` said 22.12, so npm
+  warned about jsdom and its dependencies (`EBADENGINE`) on earlier Node 22 releases.
+- A missing collection used to be noted on the console only, and a missing categories or tags
+  field on posts not at all. Both are warnings now (`COLLECTION_MISSING`, `FIELD_MISSING`).
+- `analyze`: `counts.customPostTypes` counts only the types the import brings over; the new
+  `customTypes` lists every custom post type and taxonomy.
+- `--only` accepts the steps of custom types, which are named after their collections.
+
+### Development
+
+- Test fixtures from real WordPress 7.1 sites, built in Docker by `scripts/fixtures` and
+  exported with both WordPress's exporter and WP-CLI. The `core` site has a custom post type
+  with a hierarchical taxonomy and a hierarchical custom post type.
+- CI runs the unit tests on the lowest supported Node.js versions too, and installs the packed
+  package there without engine warnings.
+- Tests of the Payload features the import relies on (hasMany numbers, localized fields).
+
 ## [0.1.0] - Unreleased
 
 First release.

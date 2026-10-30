@@ -40,6 +40,12 @@ export const printSummary = (r: AnalyzeReport): void => {
   for (const [name, detected] of names) if (detected) found.push(name)
   out(`  Editor       ${r.content.gutenbergItems} block, ${r.content.classicItems} classic`)
   out(`  Detected     ${found.join(', ') || 'no builders or plugins'}`)
+  const pluginData = r.customTypes.postTypes.filter((t) => !t.imported)
+  if (pluginData.length > 0) {
+    out(
+      `  Plugin data  ${pluginData.map((t) => `${t.name} (${t.items})`).join(', ')}: not imported`,
+    )
+  }
   const unsupported = r.content.blocks.filter((b) => b.support === 'unknown').map((b) => b.name)
   if (unsupported.length > 0) out(`  No converter ${unsupported.join(', ')}`)
   if (r.content.shortcodes.length > 0) {

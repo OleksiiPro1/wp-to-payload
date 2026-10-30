@@ -82,6 +82,12 @@ describe('analyzeExport', () => {
     })
     // Shop and ACF internals are not custom content types.
     expect(r.counts.customPostTypes).toEqual({})
+    expect(r.customTypes.postTypes.map((t) => [t.name, t.imported, t.reason])).toEqual([
+      ['acf-field', false, 'ACF field definitions'],
+      ['acf-field-group', false, 'ACF field definitions'],
+      ['product', false, 'WooCommerce products'],
+      ['shop_order', false, 'WooCommerce orders (personal data)'],
+    ])
     expect(r.media.hosts).toEqual(['cdn.example-cdn.com'])
     expect(r.complexity.level).toBe('complex')
   })
