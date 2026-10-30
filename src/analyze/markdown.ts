@@ -86,12 +86,9 @@ export const renderMarkdown = (r: AnalyzeReport): string => {
     ['Categories', c.categories, ''],
     ['Tags', c.tags, ''],
     ['Authors', c.authors, ''],
-    ['Comments', c.comments, 'not migrated in 0.1'],
-    ['Menu items', c.menuItems, 'not migrated in 0.1'],
+    ['Comments', c.comments, 'not migrated'],
+    ['Menu items', c.menuItems, 'not migrated'],
   ]
-  for (const [type, n] of Object.entries(c.customPostTypes))
-    rows.push([`Custom type \`${type}\``, n, 'not migrated in 0.1'])
-  for (const [tax, n] of Object.entries(c.otherTerms)) rows.push([`Taxonomy \`${tax}\``, n, ''])
   push(...tableOf(['Type', 'Count', 'Notes'], rows), '')
   push(
     `Editor: ${r.content.gutenbergItems} items use blocks (Gutenberg), ${r.content.classicItems} use the classic editor, ${r.content.emptyItems} are empty.` +
@@ -100,6 +97,52 @@ export const renderMarkdown = (r: AnalyzeReport): string => {
         : ''),
     '',
   )
+
+  push('## Custom post types and taxonomies', '')
+  const { postTypes, taxonomies } = r.customTypes
+  const importNote = (x: { imported: boolean; reason?: string }) =>
+    x.imported ? '✅ own collection' : `❌ ${x.reason ?? 'not imported'}`
+  const names = (list: string[]) => list.map((n) => `\`${n}\``).join(', ') || '–'
+  if (postTypes.length === 0 && taxonomies.length === 0) {
+    push('None: only posts, pages, categories and tags.', '')
+  }
+  if (postTypes.length > 0) {
+    push(
+      ...tableOf(
+        ['Post type', 'Items', 'Statuses', 'Hierarchical', 'Taxonomies', 'Import'],
+        postTypes.map((t) => [
+          `\`${t.name}\``,
+          t.items,
+          statusText(t.byStatus),
+          t.hierarchical ? 'yes' : 'no',
+          names(t.taxonomies),
+          importNote(t),
+        ]),
+      ),
+      '',
+    )
+  }
+  if (taxonomies.length > 0) {
+    push(
+      ...tableOf(
+        ['Taxonomy', 'Terms', 'Hierarchical', 'Used by', 'Import'],
+        taxonomies.map((t) => [
+          `\`${t.name}\``,
+          t.terms,
+          t.hierarchical ? 'yes' : 'no',
+          names(t.postTypes),
+          importNote(t),
+        ]),
+      ),
+      '',
+    )
+  }
+  if (postTypes.some((t) => t.imported) || taxonomies.some((t) => t.imported)) {
+    push(
+      '`scaffold export.xml` writes a collection for each of them; the config file can map them to collections of your own.',
+      '',
+    )
+  }
 
   push('## Gutenberg blocks', '')
   if (r.content.blocks.length === 0) push('No blocks found.', '')
@@ -130,7 +173,7 @@ export const renderMarkdown = (r: AnalyzeReport): string => {
   push('## Plugins and features', '')
   push(
     ...tableOf(
-      ['Feature', 'Found', 'Items', 'In version 0.1'],
+      ['Feature', 'Found', 'Items', 'Import'],
       [
         detectionRow('Elementor', r.builders.elementor, 'text kept, layout lost'),
         detectionRow('Divi', r.builders.divi, 'text kept, layout lost'),

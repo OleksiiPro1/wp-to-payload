@@ -101,6 +101,35 @@ describe('real WordPress exports', () => {
       customPostTypes: { guide: 2, recipe: 2 },
       otherTerms: { nav_menu: 2, recipe_category: 3 },
     })
+    expect(r.customTypes).toEqual({
+      postTypes: [
+        {
+          name: 'guide',
+          items: 2,
+          byStatus: { publish: 2 },
+          hierarchical: true,
+          taxonomies: [],
+          imported: true,
+        },
+        {
+          name: 'recipe',
+          items: 2,
+          byStatus: { publish: 2 },
+          hierarchical: false,
+          taxonomies: ['recipe_category'],
+          imported: true,
+        },
+      ],
+      taxonomies: [
+        {
+          name: 'recipe_category',
+          terms: 3,
+          hierarchical: true,
+          postTypes: ['recipe'],
+          imported: true,
+        },
+      ],
+    })
     expect(r.content).toMatchObject({ gutenbergItems: 13, classicItems: 1, passwordProtected: 1 })
     const support = Object.fromEntries(r.content.blocks.map((b) => [b.name, b.support]))
     expect(support).toMatchObject({
