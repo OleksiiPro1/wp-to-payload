@@ -68,6 +68,44 @@ test/
 - New warning codes go into `src/report/warnings.ts` and [docs/warnings.md](docs/warnings.md).
 - Behaviour visible to users goes into [CHANGELOG.md](CHANGELOG.md) under "Unreleased".
 - Keep runtime dependencies to a minimum; discuss a new one in an issue first.
+- `main` only changes through pull requests with green CI.
+
+## Releasing
+
+Releases are published to npm by [`.github/workflows/publish.yml`](.github/workflows/publish.yml)
+when a version tag is pushed. It uses npm trusted publishing: npm trusts the workflow through
+GitHub's OIDC token, so there is no npm token in the repository, and every release gets a
+provenance attestation. The first version, 0.1.0, is published by hand; trusted publishing is
+configured in the package's settings on npmjs.com.
+
+1. On a branch, prepare the release:
+
+   ```bash
+   npm version 0.2.0 --no-git-tag-version
+   ```
+
+   This updates `package.json` and `package-lock.json`. In [CHANGELOG.md](CHANGELOG.md), turn
+   the unreleased section into `## [0.2.0] - YYYY-MM-DD`. Commit as `chore: release 0.2.0`,
+   open a pull request to `main` and merge it once CI is green.
+
+2. Tag the merge commit on `main` and push the tag:
+
+   ```bash
+   git switch main && git pull
+   git tag -a v0.2.0 -m "wp-to-payload 0.2.0"
+   git push origin v0.2.0
+   ```
+
+3. The workflow checks that Node.js is 22.14 or newer and npm 11.5.1 or newer, that the tag
+   matches the version in `package.json` and that the tagged commit is on `main`. It then runs
+   lint, typecheck, unit tests and the build, and publishes. Versions with a pre-release part
+   (`0.3.0-beta.1`) are published under the `next` dist-tag, all others under `latest`.
+
+4. Create a GitHub release from the tag with the changelog entry.
+
+If the workflow fails before publishing, fix the problem on `main` through a pull request,
+delete the tag (`git push origin :refs/tags/v0.2.0` and `git tag -d v0.2.0`) and tag again.
+A version that reached npm cannot be published again; release the next patch version instead.
 
 ## Security
 

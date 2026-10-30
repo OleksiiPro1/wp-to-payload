@@ -1,0 +1,48 @@
+name: Publish
+
+# Publishes to npm when a version tag (v0.2.0, v0.3.0-beta.1, …) is pushed. Uses npm trusted
+# publishing: npm trusts this workflow through GitHub's OIDC token, so no npm token is stored,
+# and provenance is attached to every release automatically.
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+  id-token: write # OIDC token for trusted publishing and provenance
+
+concurrency:
+  group: publish-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Publish ${{ github.ref_name }}
+    # Trusted publishing works on GitHub-hosted runners only.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Full history, to check that the tag points to a commit on main.
+          fetch-depth: 0
+          persist-credentials: false
+      # No registry-url and no cache: registry-url writes an _authToken line into .npmrc that
+      # gets in the way of OIDC, and a release job should not reuse caches from other runs.
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+      - name: Install npm 11.5.1 or newer
+        run: npm install --global npm@^11.5.1
+      - name: Check versions, tag and branch
+        run: node scripts/check-release.mjs
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+      - name: Publish to npm
+        run: |
+          version="$(node -p "require('./package.json').version")"
+          dist_tag=latest
+          case "$version" in *-*) dist_tag=next ;; esac
+          npm publish --provenance --access public --tag "$dist_tag"
