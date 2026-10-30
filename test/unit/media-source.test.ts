@@ -92,3 +92,33 @@ describe('MediaSource errors', () => {
     })
   })
 })
+
+describe('MediaSource redirects', () => {
+  const redirecting = (target: string) =>
+    (async (url: URL) =>
+      url.pathname.endsWith('a.png')
+        ? new Response(null, { status: 301, headers: { location: target } })
+        : new Response(Buffer.from('png'), {
+            headers: { 'content-type': 'image/png' },
+          })) as unknown as typeof fetch
+
+  it('follows redirects to allowed hosts', async () => {
+    const source = new MediaSource({
+      ...base,
+      fetchImpl: redirecting('/wp-content/uploads/2024/01/b.png'),
+    })
+    expect(await source.get(attachment())).toMatchObject({ ok: true, file: { size: 3 } })
+  })
+
+  it('does not follow redirects to other hosts', async () => {
+    const source = new MediaSource({
+      ...base,
+      fetchImpl: redirecting('https://elsewhere.example.net/b.png'),
+    })
+    expect(await source.get(attachment())).toMatchObject({
+      ok: false,
+      skipped: true,
+      reason: 'host elsewhere.example.net is not allowed (add it with --media-host or media.hosts)',
+    })
+  })
+})

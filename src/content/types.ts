@@ -35,6 +35,8 @@ export interface ContentContext {
   attachmentsOf: (postId: number) => IndexedAttachment[]
   /** Payload ID of an imported attachment; `undefined` when it was not imported. */
   mediaId: (wpId: number) => string | number | undefined
+  /** URL of an imported file in Payload, for links to it. */
+  mediaUrl?: (wpId: number) => string | undefined
   /** Slug of the upload collection images point to. */
   mediaCollection: string
   capabilities: EditorCapabilities

@@ -128,6 +128,8 @@ describe.skipIf(!installed)('import into a Payload 3 project with SQLite', () =>
       teamParent: number | null
       breadParent: number | null
       redirects: string[]
+      contactLinks: string[]
+      loafUrl: string
     }>(
       dir,
       `${countAll.replace('return counts', '')}
@@ -144,12 +146,17 @@ describe.skipIf(!installed)('import into a Payload 3 project with SQLite', () =>
       const bread = (await payload.find({ collection: 'categories', where: { slug: { equals: 'bread' } }, depth: 0 })).docs[0] as any
       const redirects = (await payload.find({ collection: 'redirects', depth: 0, pagination: false, sort: 'from' })).docs
         .map((d: any) => d.from + ' ' + d.to.type + ':' + (d.to.reference?.value ?? d.to.url))
+      const contact = (await payload.find({ collection: 'pages', where: { wpId: { equals: 22 } }, depth: 0 })).docs[0] as any
+      const contactLinks: string[] = []
+      const collect = (n: any) => { if (n.type === 'link') contactLinks.push(n.fields.url); (n.children ?? []).forEach(collect) }
+      collect(contact.content.root)
+      const loaf = (await payload.find({ collection: 'media', where: { wpId: { equals: 102 } }, depth: 0 })).docs[0] as any
       const links: string[] = []
       const walk = (n: any) => { if (n.type === 'link') links.push(n.fields.url); (n.children ?? []).forEach(walk) }
       walk(post.content.root)
       return { counts, ids, post: { ...post, content: undefined, links }, nodes,
         draft: { status: draft._status, slug: draft.slug }, teamParent: team.parent ?? null,
-        breadParent: bread.parent ?? null, redirects }`,
+        breadParent: bread.parent ?? null, redirects, contactLinks, loafUrl: loaf.url }`,
     )
 
     expect(data.counts).toEqual({
@@ -200,6 +207,9 @@ describe.skipIf(!installed)('import into a Payload 3 project with SQLite', () =>
       'paragraph',
     ])
     expect(data.draft).toEqual({ status: 'draft', slug: 'upcoming-recipe' })
+    // A link to a file in the media library points to the imported file.
+    expect(data.loafUrl).toMatch(/loaf\.png$/)
+    expect(data.contactLinks).toEqual([data.loafUrl])
     expect(data.teamParent).toBe(ids.pages?.[20])
     expect(data.breadParent).toBe(categories[3])
     expect(data.redirects).toEqual([

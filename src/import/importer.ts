@@ -289,7 +289,11 @@ export const importExport = async (
     schema: CollectionSchema,
     key: DocKey,
     raw: Record<string, unknown>,
-    extra: { draft?: boolean; file?: Parameters<PayloadLike['create']>[0]['file'] } = {},
+    extra: {
+      draft?: boolean
+      file?: Parameters<PayloadLike['create']>[0]['file']
+      onWritten?: (doc: PayloadDoc) => void
+    } = {},
   ): Promise<DocId | undefined> => {
     const stats = result.phases[phase]
     const { data, missing } = schema.filter(raw)
@@ -321,6 +325,7 @@ export const importExport = async (
         doc = await payload.update({ ...args, id })
         stats.updated++
       }
+      extra.onWritten?.(doc)
       return doc.id
     } catch (error) {
       stats.failed++
@@ -339,6 +344,8 @@ export const importExport = async (
 
   // Media ------------------------------------------------------------------------------------
   const mediaIds = new Map<number, DocId>()
+  /** URLs of imported files, so links to them in content point to Payload. */
+  const mediaUrls = new Map<number, string>()
   if (selected.has('media')) {
     const schema = schemaOf(slugs.media) as CollectionSchema
     const ids = await loadExisting(schema.slug)
@@ -396,13 +403,12 @@ export const importExport = async (
           const kept = ids.get(a.id)
           if (kept !== undefined) mediaIds.set(a.id, kept)
         } else {
-          const id = await upsert(
-            'media',
-            schema,
-            a.id,
-            data,
-            fileResult?.ok ? { file: fileResult.file } : {},
-          )
+          const id = await upsert('media', schema, a.id, data, {
+            ...(fileResult?.ok ? { file: fileResult.file } : {}),
+            onWritten: (doc) => {
+              if (typeof doc.url === 'string') mediaUrls.set(a.id, doc.url)
+            },
+          })
           if (id !== undefined) mediaIds.set(a.id, id)
         }
         progress('media', ++done, attachments.length)
@@ -558,6 +564,7 @@ export const importExport = async (
         media: matcher,
         attachmentsOf: (id) => attachmentsByParent.get(id) ?? [],
         mediaId: (wpId) => mediaIds.get(wpId),
+        mediaUrl: (wpId) => mediaUrls.get(wpId),
         mediaCollection: slugs.media,
         capabilities: editor.info.capabilities,
         builders: detectBuilders(item),

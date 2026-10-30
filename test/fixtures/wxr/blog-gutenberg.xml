@@ -305,7 +305,7 @@ line two]]></content:encoded>
 		<guid isPermaLink="false">https://blog.example.com/?page_id=22</guid>
 		<description></description>
 		<content:encoded><![CDATA[<!-- wp:paragraph -->
-<p>Write to hello@example.com.</p>
+<p>Write to hello@example.com or download our <a href="https://blog.example.com/wp-content/uploads/2024/01/loaf.png">price list</a>.</p>
 <!-- /wp:paragraph -->]]></content:encoded>
 		<excerpt:encoded><![CDATA[]]></excerpt:encoded>
 		<wp:post_id>22</wp:post_id>

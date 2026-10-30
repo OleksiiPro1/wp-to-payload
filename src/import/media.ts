@@ -98,25 +98,18 @@ export class MediaSource {
     if (url.protocol !== 'https:' && url.protocol !== 'http:') {
       return { ok: false, skipped: true, reason: `unsupported URL scheme ${url.protocol}` }
     }
-    if (!this.hosts.has(stripWww(url.host))) {
-      return {
-        ok: false,
-        skipped: true,
-        reason: `host ${url.host} is not allowed (add it with --media-host or media.hosts)`,
-      }
-    }
-    const fetchImpl = this.options.fetchImpl ?? fetch
+    const notAllowed = (host: string): MediaFileResult => ({
+      ok: false,
+      skipped: true,
+      reason: `host ${host} is not allowed (add it with --media-host or media.hosts)`,
+    })
+    if (!this.hosts.has(stripWww(url.host))) return notAllowed(url.host)
     let lastError = ''
     for (let attempt = 0; attempt <= this.options.retries; attempt++) {
       if (attempt > 0) await delay(500 * 2 ** (attempt - 1))
       try {
-        const response = await fetchImpl(url, {
-          signal: AbortSignal.timeout(this.options.timeoutMs),
-          redirect: 'follow',
-          headers: {
-            'user-agent': 'wp-to-payload (+https://github.com/oleksiipro1/wp-to-payload)',
-          },
-        })
+        const response = await this.fetchFollowingAllowedRedirects(url)
+        if (typeof response === 'string') return notAllowed(response)
         if (!response.ok) {
           lastError = `HTTP ${response.status}`
           // Client errors do not get better with retries.
@@ -159,5 +152,27 @@ export class MediaSource {
       }
     }
     return { ok: false, skipped: false, reason: `download failed: ${lastError}` }
+  }
+
+  /**
+   * Follows up to five redirects itself, so a redirect cannot lead to a host that is not
+   * allowed. Returns the refused host instead of a response.
+   */
+  private async fetchFollowingAllowedRedirects(start: URL): Promise<Response | string> {
+    const fetchImpl = this.options.fetchImpl ?? fetch
+    let url = start
+    for (let hop = 0; ; hop++) {
+      const response = await fetchImpl(url, {
+        signal: AbortSignal.timeout(this.options.timeoutMs),
+        redirect: 'manual',
+        headers: { 'user-agent': 'wp-to-payload (+https://github.com/oleksiipro1/wp-to-payload)' },
+      })
+      const location = response.headers.get('location')
+      if (response.status < 300 || response.status >= 400 || !location || hop >= 5) return response
+      const next = new URL(location, url)
+      const scheme = next.protocol === 'https:' || next.protocol === 'http:'
+      if (!scheme || !this.hosts.has(stripWww(next.host))) return next.host || next.protocol
+      url = next
+    }
   }
 }

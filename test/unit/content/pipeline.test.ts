@@ -220,3 +220,19 @@ describe('prepareContent: classic content and shortcodes', () => {
     expect(ctx.warnings.warnings.map((w) => w.code)).toEqual(['BUILDER_MARKUP'])
   })
 })
+
+describe('prepareContent: links to files', () => {
+  it('point to the imported file in Payload', () => {
+    const ctx = contentContext(index, {
+      postId: 22,
+      mediaUrl: (wpId) => (wpId === 102 ? '/api/media/file/loaf.png' : undefined),
+    })
+    const { html } = prepareContent(
+      '<p><a href="https://blog.example.com/wp-content/uploads/2024/01/loaf.png">Price list</a> and <a href="https://blog.example.com/wp-content/uploads/2024/02/croissant.png">menu</a></p>',
+      ctx,
+    )
+    expect(html).toBe(
+      '<p><a href="/api/media/file/loaf.png">Price list</a> and <a href="https://blog.example.com/wp-content/uploads/2024/02/croissant.png">menu</a></p>',
+    )
+  })
+})

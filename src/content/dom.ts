@@ -336,7 +336,14 @@ export const prepareDom = (html: string, ctx: ContentContext): PreparedContent =
       continue
     }
     const rewritten = ctx.urls.rewriteHref(href)
-    if (rewritten !== undefined) a.setAttribute('href', rewritten)
+    if (rewritten !== undefined) {
+      a.setAttribute('href', rewritten)
+      continue
+    }
+    // Links to files in the media library (PDFs, downloads) point to the imported file.
+    const fileId = /\/uploads\//.test(href) ? ctx.media.match(href) : undefined
+    const fileUrl = fileId === undefined ? undefined : ctx.mediaUrl?.(fileId)
+    if (fileUrl) a.setAttribute('href', fileUrl)
   }
 
   for (const p of all('p')) if (isBlank(p) && !p.querySelector('img')) p.remove()
