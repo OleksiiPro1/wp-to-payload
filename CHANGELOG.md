@@ -21,7 +21,8 @@ First release.
   through the Local API, with all relations. Repeatable: documents are matched by `wpId`.
   Supports `--dry-run`, `--only`, `--limit` and a local `--uploads-dir`.
 - Gutenberg and classic content to Lexical with Payload's own converter; images become upload
-  nodes, internal links point to the new URLs, Yoast and Rank Math data fill `meta`.
+  nodes, internal links point to the new URLs, links to files point to the imported media,
+  Yoast and Rank Math data fill `meta`.
 - `redirects`: old to new URLs as CSV, JSON, Next.js `redirects()`, Apache, nginx and Netlify,
   or into `@payloadcms/plugin-redirects`.
 - `wp-to-payload.config.json` for URL patterns, collection and field names.

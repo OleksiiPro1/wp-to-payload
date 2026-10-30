@@ -63,6 +63,7 @@ writing anything.
 | Featured images                                                                                                                  | `featuredImage`                                                                                | ✅  |
 | Images in content                                                                                                                | Upload nodes pointing to the imported media                                                    | ✅  |
 | Links between posts and pages                                                                                                    | Rewritten to the new URLs                                                                      | ✅  |
+| Links to files in the media library (PDFs, downloads)                                                                            | Point to the imported files                                                                    | ✅  |
 | Yoast SEO and Rank Math                                                                                                          | `meta.title`, `meta.description`, `meta.image` (SEO plugin), template variables resolved       | ✅  |
 | Canonical URLs                                                                                                                   | Written only if your `meta` group has a `canonical` field                                      | ⚠️  |
 | Gutenberg: paragraph, heading, list, quote, image, gallery, code, preformatted, table, separator, buttons, embed, columns, group | Lexical rich text; code and embeds as blocks                                                   | ✅  |
@@ -148,7 +149,7 @@ you designed yourself. The report lists everything that could not be moved as it
 code per kind of problem; see [docs/warnings.md](docs/warnings.md).
 
 Media are only downloaded from the site's own hosts and the ones you allow with
-`--media-host`. Password-protected posts are imported as drafts, so their content does not
+`--media-host`, also when the server redirects. Password-protected posts are imported as drafts, so their content does not
 become public by accident.
 
 ### redirects

@@ -10,7 +10,8 @@ not in public issues. You will get an answer within a week.
 
 - It runs on your machine and sends nothing anywhere: no telemetry, no external service.
 - The only network requests are media downloads during `import`, and only from the old site's
-  hosts and the hosts you allow with `--media-host`. Files are size-limited, and `--offline`
+  hosts and the hosts you allow with `--media-host`. Redirects to other hosts are not followed.
+  Files are size-limited, and `--offline`
   turns downloads off.
 - With `--uploads-dir`, files are only read from inside that directory, whatever paths the
   export contains.
