@@ -263,7 +263,6 @@ export async function* readWxr(
         flushSite()
         item = newItem()
       } else if (name === 'wp:author' || TERM_ELEMENTS.has(name)) {
-        flushSite()
         fields = new Map()
       }
     }
