@@ -31,6 +31,8 @@ export interface WxrTerm {
   /** WXR references the parent by slug, not by ID. */
   parentSlug?: string
   description?: string
+  /** Term meta (`wp:termmeta`), for example ACF fields of a category. */
+  meta: Map<string, string[]>
 }
 
 /** A term assigned to an item (`<category domain="…" nicename="…">`). */

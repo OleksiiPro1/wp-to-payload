@@ -45,6 +45,13 @@ describe('readWxr', () => {
       name: 'Recipes & Baking',
       description: 'Everything we bake',
     })
+    expect(terms.find((t) => t.slug === 'recipes')?.meta).toEqual(
+      new Map([
+        ['color', ['#c08040']],
+        ['featured', ['1']],
+      ]),
+    )
+    expect(terms.find((t) => t.slug === 'news')?.meta.size).toBe(0)
 
     const all = items(records)
     expect(all.map((i) => `${i.type}:${i.id}`)).toEqual([
