@@ -1,4 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { createServer, type Server } from 'node:http'
+import type { AddressInfo } from 'node:net'
 import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { fixture } from '../helpers.js'
@@ -8,6 +10,7 @@ import {
   projectInstalled,
   queryPayload,
   runCli,
+  runCliAsync,
   writePayloadConfig,
 } from '../support/payload-project.js'
 import { solidPng } from '../support/png.js'
@@ -258,5 +261,68 @@ describe.skipIf(!installed)('import preflight', () => {
     ])
     expect(run.status, run.output).toBe(2)
     expect(run.output).toContain('collection "tags" has no "wpId" field')
+  })
+})
+
+describe.skipIf(!installed)('media downloads', () => {
+  let dir: string
+  let server: Server
+  let requests: string[]
+
+  beforeAll(async () => {
+    buildPackage()
+    dir = createRun('downloads')
+    requests = []
+    const files: Record<string, Buffer> = {
+      '/wp-content/uploads/2024/01/hero.png': solidPng(2, 2, [10, 20, 30]),
+      '/wp-content/uploads/2024/01/loaf.png': solidPng(2, 2, [40, 50, 60]),
+    }
+    server = createServer((req, res) => {
+      requests.push(req.url ?? '')
+      const body = files[req.url ?? '']
+      if (!body) {
+        res.writeHead(404).end('not found')
+        return
+      }
+      res.writeHead(200, { 'content-type': 'image/png', 'content-length': body.length }).end(body)
+    })
+    await new Promise<void>((done) => server.listen(0, '127.0.0.1', done))
+  })
+
+  afterAll(async () => {
+    await new Promise((done) => server.close(done))
+    if (dir && !process.env.WP2P_KEEP_RUNS) rmSync(dir, { recursive: true, force: true })
+  })
+
+  it('downloads files from allowed hosts and reports the ones that fail', async () => {
+    const host = `127.0.0.1:${(server.address() as AddressInfo).port}`
+    const xml = readFileSync(fixture('blog-gutenberg.xml'), 'utf8').replaceAll(
+      'https://blog.example.com/wp-content/uploads/',
+      `http://${host}/wp-content/uploads/`,
+    )
+    const exportFile = join(dir, 'export.xml')
+    writeFileSync(exportFile, xml)
+    expect(runCli(dir, ['scaffold']).status).toBe(0)
+    writePayloadConfig(dir)
+
+    const run = await runCliAsync(dir, [
+      'import',
+      exportFile,
+      '--only',
+      'media',
+      '--media-host',
+      host,
+    ])
+    expect(run.status, run.output).toBe(0)
+    const report = JSON.parse(
+      readFileSync(join(dir, 'wp-to-payload-report', 'import-report.json'), 'utf8'),
+    ) as ImportReport
+    expect(report.phases.media).toMatchObject({ created: 2, failed: 1 })
+    expect(report.warnings.filter((w) => w.code === 'MEDIA_FAILED').map((w) => w.wpId)).toEqual([
+      103,
+    ])
+    expect(requests).toContain('/wp-content/uploads/2024/01/hero.png')
+    // 404 is not retried.
+    expect(requests.filter((r) => r.endsWith('croissant.png'))).toHaveLength(1)
   })
 })

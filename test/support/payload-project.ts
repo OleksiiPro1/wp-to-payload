@@ -1,4 +1,4 @@
-import { execFileSync, spawnSync } from 'node:child_process'
+import { execFileSync, spawn, spawnSync } from 'node:child_process'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -63,6 +63,20 @@ export const runCli = (dir: string, args: string[]): CliRun => {
   })
   return { status: result.status, output: `${result.stdout}\n${result.stderr}` }
 }
+
+/** Like `runCli`, but does not block the event loop (needed when the test serves HTTP itself). */
+export const runCliAsync = (dir: string, args: string[]): Promise<CliRun> =>
+  new Promise((done, reject) => {
+    const child = spawn(process.execPath, [cli, ...args], {
+      cwd: dir,
+      env: { ...process.env, NO_COLOR: '1' },
+    })
+    let output = ''
+    child.stdout.on('data', (chunk: Buffer) => (output += chunk.toString()))
+    child.stderr.on('data', (chunk: Buffer) => (output += chunk.toString()))
+    child.on('error', reject)
+    child.on('close', (status) => done({ status, output }))
+  })
 
 /** Runs a script with `payload run` in the project and returns the JSON it writes. */
 export const queryPayload = <T>(dir: string, body: string): T => {

@@ -84,6 +84,7 @@ const byCount = <T extends { name: string; count: number }>(a: T, b: T) =>
 export const analyzeExport = async (file: string): Promise<AnalyzeReport> => {
   let site: WxrSite | undefined
   const terms: WxrTerm[] = []
+  const termKeys = new Set<string>()
   const issues: WxrParseIssue[] = []
   let authors = 0
 
@@ -149,7 +150,12 @@ export const analyzeExport = async (file: string): Promise<AnalyzeReport> => {
       continue
     }
     if (record.kind === 'term') {
-      terms.push(record.term)
+      // Some exports list a term twice (as wp:category and as wp:term).
+      const key = `${record.term.taxonomy}:${record.term.slug}`
+      if (!termKeys.has(key)) {
+        termKeys.add(key)
+        terms.push(record.term)
+      }
       continue
     }
 

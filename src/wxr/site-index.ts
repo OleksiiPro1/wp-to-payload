@@ -139,6 +139,7 @@ export const buildSiteIndex = async (file: string | Readable): Promise<SiteIndex
     posts: new Map(),
     issues: [],
   }
+  const termKeys = new Set<string>()
   for await (const record of readWxr(file, { onIssue: (i) => index.issues.push(i) })) {
     switch (record.kind) {
       case 'site':
@@ -147,9 +148,15 @@ export const buildSiteIndex = async (file: string | Readable): Promise<SiteIndex
       case 'author':
         index.authors.set(record.author.login, record.author)
         break
-      case 'term':
-        index.terms.push(record.term)
+      case 'term': {
+        // Some exports list a term twice (as wp:category and as wp:term).
+        const key = `${record.term.taxonomy}:${record.term.slug}`
+        if (!termKeys.has(key)) {
+          termKeys.add(key)
+          index.terms.push(record.term)
+        }
         break
+      }
       case 'item': {
         const { item } = record
         if (item.type === 'attachment') {

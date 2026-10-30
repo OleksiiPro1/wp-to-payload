@@ -108,6 +108,9 @@ const sortByParent = (terms: WxrTerm[]): WxrTerm[] => {
   return out
 }
 
+/** How an imported document is found again: its WordPress ID, or its slug when there is none. */
+type DocKey = number | { slug: string }
+
 const emptyPhase = (): PhaseResult => ({ created: 0, updated: 0, skipped: 0, failed: 0 })
 
 /**
@@ -251,23 +254,52 @@ export const importExport = async (
     return map
   }
 
-  /** Creates or updates the document with this WordPress ID. Returns its Payload ID. */
+  // Some exports (WordPress.com) have authors or terms without IDs; those are matched by slug.
+  const bySlug = new Map<string, Map<string, DocId>>()
+  const findBySlug = async (
+    schema: CollectionSchema,
+    value: string,
+  ): Promise<DocId | undefined> => {
+    const cache = bySlug.get(schema.slug) ?? new Map<string, DocId>()
+    bySlug.set(schema.slug, cache)
+    if (cache.has(value)) return cache.get(value)
+    if (!schema.has('slug')) return undefined
+    const found = await payload.find({
+      collection: schema.slug,
+      where: { slug: { equals: value } },
+      limit: 1,
+      depth: 0,
+      draft: schema.hasDrafts,
+      overrideAccess: true,
+    })
+    const id = found.docs[0]?.id
+    if (id !== undefined) cache.set(value, id)
+    return id
+  }
+
+  /** The Payload ID of an already imported document, by WordPress ID or by slug. */
+  const existingId = async (schema: CollectionSchema, key: DocKey): Promise<DocId | undefined> =>
+    typeof key === 'number'
+      ? (await loadExisting(schema.slug)).get(key)
+      : findBySlug(schema, key.slug)
+
+  /** Creates or updates the document with this WordPress ID (or slug). Returns its Payload ID. */
   const upsert = async (
     phase: Phase,
     schema: CollectionSchema,
-    wpId: number,
+    key: DocKey,
     raw: Record<string, unknown>,
     extra: { draft?: boolean; file?: Parameters<PayloadLike['create']>[0]['file'] } = {},
   ): Promise<DocId | undefined> => {
     const stats = result.phases[phase]
-    const ids = await loadExisting(schema.slug)
     const { data, missing } = schema.filter(raw)
     reportMissing(schema.slug, missing)
-    const id = ids.get(wpId)
+    const id = await existingId(schema, key)
+    const wpId = typeof key === 'number' ? key : undefined
     if (options.dryRun) {
       if (id === undefined) stats.created++
       else stats.updated++
-      return id ?? `dry-run-${wpId}`
+      return id ?? `dry-run-${typeof key === 'number' ? key : key.slug}`
     }
     try {
       const args = {
@@ -282,7 +314,8 @@ export const importExport = async (
       let doc: PayloadDoc
       if (id === undefined) {
         doc = await payload.create(args)
-        ids.set(wpId, doc.id)
+        if (typeof key === 'number') (await loadExisting(schema.slug)).set(key, doc.id)
+        else bySlug.get(schema.slug)?.set(key.slug, doc.id)
         stats.created++
       } else {
         doc = await payload.update({ ...args, id })
@@ -291,7 +324,11 @@ export const importExport = async (
       return doc.id
     } catch (error) {
       stats.failed++
-      result.errors.push({ phase, wpId, message: errorMessage(error) })
+      result.errors.push({
+        phase,
+        ...(wpId === undefined ? {} : { wpId }),
+        message: errorMessage(error),
+      })
       return id
     }
   }
@@ -382,11 +419,18 @@ export const importExport = async (
     const slug = phaseCollection[phase]
     const schema = schemaOf(slug)
     if (!schema?.has(f.wpId)) return
-    const ids = await loadExisting(slug)
     const terms = index.terms.filter((t) => t.taxonomy === taxonomy)
+    // A term ID used by two different terms cannot identify either; fall back to the slug.
+    const idOwners = new Map<number, string>()
+    const keyOf = (term: WxrTerm): DocKey => {
+      if (term.id === undefined) return { slug: term.slug }
+      const owner = idOwners.get(term.id)
+      if (owner === undefined) idOwners.set(term.id, term.slug)
+      return owner === undefined || owner === term.slug ? term.id : { slug: term.slug }
+    }
     if (!selected.has(phase)) {
       for (const t of terms) {
-        const id = t.id === undefined ? undefined : ids.get(t.id)
+        const id = await existingId(schema, keyOf(t))
         if (id !== undefined) termIds.set(termKey(taxonomy, t.slug), id)
       }
       return
@@ -395,21 +439,18 @@ export const importExport = async (
     let done = 0
     for (const term of taxonomy === 'category' ? sortByParent(terms) : terms) {
       done++
-      if (term.id === undefined) {
-        result.phases[phase].skipped++
-        continue
-      }
+      const key = keyOf(term)
       const parentId = term.parentSlug ? termIds.get(termKey(taxonomy, term.parentSlug)) : undefined
       const data: Record<string, unknown> = {
         title: term.name,
         slug: term.slug,
         description: term.description,
-        [f.wpId]: term.id,
+        [f.wpId]: typeof key === 'number' ? key : undefined,
       }
       if (parentId !== undefined && schema.relatesTo('parent', slug)) {
         data.parent = schema.relationValue('parent', slug, [parentId])
       }
-      const id = await upsert(phase, schema, term.id, data)
+      const id = await upsert(phase, schema, key, data)
       if (id !== undefined) termIds.set(termKey(taxonomy, term.slug), id)
       progress(phase, done, terms.length)
     }
@@ -422,23 +463,23 @@ export const importExport = async (
   {
     const schema = schemaOf(slugs.authors)
     if (schema?.has(f.wpId)) {
-      const ids = await loadExisting(slugs.authors)
       const authors = [...index.authors.values()]
       if (selected.has('authors')) log(`Authors: ${authors.length}`)
       for (const author of authors) {
-        if (author.id === undefined) continue
+        const slug = slugify(author.login) || `author-${author.id ?? authors.indexOf(author) + 1}`
+        const key: DocKey = author.id ?? { slug }
         if (!selected.has('authors')) {
-          const id = ids.get(author.id)
+          const id = await existingId(schema, key)
           if (id !== undefined) authorIds.set(author.login, id)
           continue
         }
         const data = {
           name: author.displayName,
-          slug: slugify(author.login) || `author-${author.id}`,
+          slug,
           email: config.importAuthorEmails ? author.email : undefined,
           [f.wpId]: author.id,
         }
-        const id = await upsert('authors', schema, author.id, data)
+        const id = await upsert('authors', schema, key, data)
         if (id !== undefined) authorIds.set(author.login, id)
       }
     }
@@ -534,8 +575,7 @@ export const importExport = async (
       reportMissing(schema.slug, [f.content])
     }
 
-    const authorWpId = index.authors.get(item.creator)?.id
-    const authorId = authorWpId === undefined ? undefined : authorIds.get(item.creator)
+    const authorId = authorIds.get(item.creator)
     if (authorId !== undefined && schema.relatesTo(f.author, slugs.authors)) {
       data[f.author] = schema.relationValue(f.author, slugs.authors, [authorId])
     }

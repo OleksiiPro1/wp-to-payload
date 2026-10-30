@@ -72,3 +72,24 @@ jobs:
       - run: npm ci --prefix test/payload-project
       - run: npm run build
       - run: npm run test:integration
+
+  external:
+    name: WordPress Theme Unit Test data
+    # Downloads test data from GitHub, so it runs weekly and on demand rather than on every push.
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            test/payload-project/package-lock.json
+      - run: npm ci
+      - run: npm ci --prefix test/payload-project
+      - run: npm run build
+      - run: npm run test:external

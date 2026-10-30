@@ -68,6 +68,27 @@ const DROPPED = new Set([
   'core/loginout',
 ])
 
+/**
+ * Families of core blocks that WordPress renders from the database at request time (theme,
+ * query, comment and site blocks). They never have stored content in an export.
+ */
+const DYNAMIC_PREFIXES = [
+  'core/post-',
+  'core/query',
+  'core/comment',
+  'core/comments',
+  'core/site-',
+  'core/term-',
+  'core/navigation',
+  'core/template-part',
+  'core/pattern',
+  'core/home-link',
+  'core/read-more',
+  'core/avatar',
+  'core/archive-title',
+  'core/latest-',
+]
+
 export const normalizeBlockName = (name: string): string =>
   name.includes('/') ? name : `core/${name}`
 
@@ -76,7 +97,8 @@ export const blockSupport = (name: string): BlockSupport => {
   if (full.startsWith('core-embed/')) return 'supported'
   if (SUPPORTED.has(full)) return 'supported'
   if (PARTIAL.has(full)) return 'partial'
-  if (DROPPED.has(full)) return 'dropped'
+  if (DROPPED.has(full) || DYNAMIC_PREFIXES.some((prefix) => full.startsWith(prefix)))
+    return 'dropped'
   return 'unknown'
 }
 

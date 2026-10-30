@@ -116,3 +116,15 @@ describe('scanShortcodes', () => {
     expect([...found.keys()]).toEqual(['gallery', 'foo', 'self', 'wrap'])
   })
 })
+
+describe('blockSupport', () => {
+  it('treats theme, query and comment blocks as dynamic', async () => {
+    const { blockSupport } = await import('../../../src/content/blocks.js')
+    expect(blockSupport('post-title')).toBe('dropped')
+    expect(blockSupport('core/query-pagination-next')).toBe('dropped')
+    expect(blockSupport('core/comments-title')).toBe('dropped')
+    expect(blockSupport('core/paragraph')).toBe('supported')
+    expect(blockSupport('core/pullquote')).toBe('partial')
+    expect(blockSupport('acme/slider')).toBe('unknown')
+  })
+})

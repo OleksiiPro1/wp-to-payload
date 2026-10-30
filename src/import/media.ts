@@ -36,6 +36,15 @@ export const uploadsPath = (attachment: IndexedAttachment): string | undefined =
   }
 }
 
+/** fetch() reports network problems as "fetch failed"; the cause says what actually happened. */
+const describeFetchError = (error: unknown): string => {
+  if (!(error instanceof Error)) return String(error)
+  if (error.name === 'TimeoutError') return 'timed out'
+  const cause = (error as { cause?: { code?: string; message?: string } }).cause
+  const detail = cause?.code ?? cause?.message
+  return detail ? `${error.message} (${detail})` : error.message
+}
+
 const delay = (ms: number) => new Promise((done) => setTimeout(done, ms))
 
 export class MediaSource {
@@ -146,7 +155,7 @@ export class MediaSource {
           },
         }
       } catch (error) {
-        lastError = error instanceof Error ? error.message : String(error)
+        lastError = describeFetchError(error)
       }
     }
     return { ok: false, skipped: false, reason: `download failed: ${lastError}` }

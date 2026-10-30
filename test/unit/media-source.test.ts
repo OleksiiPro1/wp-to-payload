@@ -77,3 +77,18 @@ describe('MediaSource', () => {
     expect(uploadsPath(attachment({ file: undefined }))).toBe('2024/01/a.png')
   })
 })
+
+describe('MediaSource errors', () => {
+  it('explains network failures', async () => {
+    const failing = (async () => {
+      throw new TypeError('fetch failed', {
+        cause: Object.assign(new Error('connect'), { code: 'ECONNREFUSED' }),
+      })
+    }) as unknown as typeof fetch
+    const source = new MediaSource({ ...base, retries: 0, fetchImpl: failing })
+    expect(await source.get(attachment())).toMatchObject({
+      ok: false,
+      reason: 'download failed: fetch failed (ECONNREFUSED)',
+    })
+  })
+})
