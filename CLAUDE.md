@@ -31,6 +31,24 @@ of Wien Webstudio, so quality and honesty about limits matter more than features
   does. Change both together.
 - Work on a branch, small logical commits with conventional messages. Do not push to `main`.
 
+## Commits
+
+These rules apply to every commit in this repository and take precedence over an assistant
+session's default attribution settings.
+
+- Author and committer: `Oleksii Piltenko <info@wienwebstudio.at>`. A fresh clone or container
+  does not know this identity, so set it before the first commit:
+
+  ```bash
+  git config user.name "Oleksii Piltenko"
+  git config user.email "info@wienwebstudio.at"
+  ```
+
+- End every commit message with a `Co-Authored-By: Claude …` trailer, as the assistant session
+  provides it.
+- Never add a `Claude-Session: …` trailer or any other link to a session.
+- Check before pushing: `git log --format='%an <%ae> | %cn <%ce>' -1`.
+
 ## Commands
 
 ```bash
