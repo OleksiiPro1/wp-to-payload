@@ -33,3 +33,50 @@ describe('cli', () => {
     expect(text).toContain('unknown command "nope"')
   })
 })
+
+describe('cli commands', () => {
+  it('analyze writes report.json and report.md', async () => {
+    const { mkdtempSync, readFileSync } = await import('node:fs')
+    const { tmpdir } = await import('node:os')
+    const { join } = await import('node:path')
+    const { fixture } = await import('../helpers.js')
+    const dir = mkdtempSync(join(tmpdir(), 'wp2p-cli-'))
+    const { code } = await capture(['analyze', fixture('blog-gutenberg.xml'), '--out', dir])
+    expect(code).toBe(0)
+    expect(JSON.parse(readFileSync(join(dir, 'report.json'), 'utf8')).counts.posts.total).toBe(4)
+    expect(readFileSync(join(dir, 'report.md'), 'utf8')).toContain('# WordPress export analysis')
+  })
+
+  it('redirects writes one file per format', async () => {
+    const { mkdtempSync, readFileSync } = await import('node:fs')
+    const { tmpdir } = await import('node:os')
+    const { join } = await import('node:path')
+    const { fixture } = await import('../helpers.js')
+    const dir = mkdtempSync(join(tmpdir(), 'wp2p-cli-'))
+    const { code } = await capture([
+      'redirects',
+      fixture('blog-gutenberg.xml'),
+      '--format',
+      'csv,netlify',
+      '--post-path',
+      '/blog/:slug',
+      '--out',
+      dir,
+    ])
+    expect(code).toBe(0)
+    expect(readFileSync(join(dir, 'redirects.csv'), 'utf8')).toContain(
+      '/2024/02/01/bakery-news/,/blog/bakery-news,301',
+    )
+    expect(readFileSync(join(dir, '_redirects'), 'utf8')).toContain('/blog/bakery-news 301')
+  })
+
+  it('rejects unknown formats and bad patterns with exit code 2', async () => {
+    const { fixture } = await import('../helpers.js')
+    expect(
+      (await capture(['redirects', fixture('blog-gutenberg.xml'), '--format', 'iis'])).code,
+    ).toBe(2)
+    expect(
+      (await capture(['redirects', fixture('blog-gutenberg.xml'), '--post-path', 'x'])).code,
+    ).toBe(2)
+  })
+})

@@ -1,0 +1,12 @@
+[
+  {
+    "source": "/2024/05/a%20b%20\\(c\\)",
+    "destination": "/blog/2024/a-b-c",
+    "permanent": true
+  },
+  {
+    "source": "/say-%22hi%22%3Anow",
+    "destination": "/blog/2024/quote",
+    "permanent": true
+  }
+]

@@ -1,3 +1,4 @@
+import type { Readable } from 'node:stream'
 import { decodeEntities } from '../util/entities.js'
 import { mimeTypeOf } from '../util/mime.js'
 import { slugify } from '../util/slug.js'
@@ -129,7 +130,7 @@ export const INTERNAL_TYPES = new Set([
 ])
 
 /** First pass over an export: everything except post bodies, so memory stays small. */
-export const buildSiteIndex = async (file: string): Promise<SiteIndex> => {
+export const buildSiteIndex = async (file: string | Readable): Promise<SiteIndex> => {
   const index: SiteIndex = {
     site: { ...emptySite },
     authors: new Map(),

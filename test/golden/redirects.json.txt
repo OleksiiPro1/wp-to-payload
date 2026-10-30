@@ -1,0 +1,16 @@
+[
+  {
+    "from": "/2024/05/a%20b%20(c)/",
+    "to": "/blog/2024/a-b-c",
+    "status": 301,
+    "kind": "permalink",
+    "wpId": 2
+  },
+  {
+    "from": "/say-%22hi%22%3Anow/",
+    "to": "/blog/2024/quote",
+    "status": 301,
+    "kind": "permalink",
+    "wpId": 3
+  }
+]

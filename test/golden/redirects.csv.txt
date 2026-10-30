@@ -1,0 +1,3 @@
+from,to,status
+/2024/05/a%20b%20(c)/,/blog/2024/a-b-c,301
+/say-%22hi%22%3Anow/,/blog/2024/quote,301
