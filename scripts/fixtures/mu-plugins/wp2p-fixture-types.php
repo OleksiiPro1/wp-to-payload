@@ -1,7 +1,7 @@
 <?php
 /**
  * Plugin Name: wp-to-payload fixture types
- * Description: A custom post type and taxonomy for the test fixtures of wp-to-payload.
+ * Description: Custom post types and a taxonomy for the test fixtures of wp-to-payload.
  */
 
 add_action(
@@ -15,6 +15,17 @@ add_action(
 				'has_archive'  => true,
 				'rewrite'      => array( 'slug' => 'rezepte' ),
 				'supports'     => array( 'title', 'editor', 'excerpt', 'thumbnail', 'author', 'custom-fields' ),
+				'show_in_rest' => true,
+			)
+		);
+		register_post_type(
+			'guide',
+			array(
+				'label'        => 'Guides',
+				'public'       => true,
+				'hierarchical' => true,
+				'rewrite'      => array( 'slug' => 'ratgeber' ),
+				'supports'     => array( 'title', 'editor', 'page-attributes' ),
 				'show_in_rest' => true,
 			)
 		);

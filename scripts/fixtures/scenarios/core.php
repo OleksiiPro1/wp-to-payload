@@ -4,8 +4,9 @@
  *
  * WordPress without plugins: blocks and classic content, media with generated sizes, a category
  * tree with term meta, tags, two authors, every post status, an earlier slug, a page tree, a
- * reusable block, comments, two menus with a submenu, and a custom post type with its own
- * taxonomy (registered by mu-plugins/wp2p-fixture-types.php). All content is made up.
+ * reusable block, comments, two menus with a submenu, a custom post type with its own
+ * hierarchical taxonomy, and a hierarchical custom post type (both registered by
+ * mu-plugins/wp2p-fixture-types.php). All content is made up.
  */
 
 require __DIR__ . '/../lib/fixtures.php';
@@ -332,7 +333,12 @@ $rolls = fx_post(
 		'post_title'   => 'Zimtschnecken',
 		'post_name'    => 'zimtschnecken',
 		'post_date'    => '2024-03-05 08:00:00',
-		'post_content' => "<!-- wp:paragraph -->\n<p>Süß und klebrig.</p>\n<!-- /wp:paragraph -->",
+		// Links to another recipe and to a term archive of the custom taxonomy.
+		'post_content' => sprintf(
+			"<!-- wp:paragraph -->\n<p>Süß und klebrig. Herzhaft geht es mit unserem <a href=\"%s\">Roggenbrot</a> weiter, mehr unter <a href=\"%s\">Süßes</a>.</p>\n<!-- /wp:paragraph -->",
+			get_permalink( $rye ),
+			get_term_link( $recipe_sweet, 'recipe_category' )
+		),
 	)
 );
 wp_set_object_terms( $rolls, array( $recipe_sweet ), 'recipe_category' );
@@ -412,6 +418,40 @@ set_theme_mod(
 	array(
 		'primary' => $main,
 		'footer'  => $footer,
+	)
+);
+
+// A child term in the recipe taxonomy and a hierarchical custom post type. They come last, so
+// the IDs of everything above stay the same.
+$sourdough_bread = fx_term(
+	'Sauerteigbrot',
+	'recipe_category',
+	array(
+		'slug'        => 'sauerteigbrot',
+		'parent_slug' => 'brot',
+	)
+);
+wp_set_object_terms( $rye, array( $sourdough_bread ), 'recipe_category', true );
+$flours = fx_post(
+	array(
+		'post_type'    => 'guide',
+		'post_title'   => 'Mehlsorten',
+		'post_name'    => 'mehlsorten',
+		'post_date'    => '2024-03-10 08:00:00',
+		'post_content' => "<!-- wp:paragraph -->\n<p>Welches Mehl wofür?</p>\n<!-- /wp:paragraph -->",
+	)
+);
+fx_post(
+	array(
+		'post_type'    => 'guide',
+		'post_title'   => 'Roggenmehl',
+		'post_name'    => 'roggenmehl',
+		'post_parent'  => $flours,
+		'post_date'    => '2024-03-11 08:00:00',
+		'post_content' => sprintf(
+			"<!-- wp:paragraph -->\n<p>Roggenmehl braucht Sauerteig, zum Beispiel für unser <a href=\"%s\">Roggenbrot</a>.</p>\n<!-- /wp:paragraph -->",
+			get_permalink( $rye )
+		),
 	)
 );
 
