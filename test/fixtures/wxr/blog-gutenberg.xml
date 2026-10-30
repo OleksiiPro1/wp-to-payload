@@ -1,0 +1,443 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!-- Synthetic test data for wp-to-payload. All names, URLs and texts are made up. -->
+<rss version="2.0"
+	xmlns:excerpt="http://wordpress.org/export/1.2/excerpt/"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:wp="http://wordpress.org/export/1.2/"
+>
+<channel>
+	<title>Example Bakery Blog</title>
+	<link>https://blog.example.com</link>
+	<description>Bread, pastry and news from a made-up bakery</description>
+	<pubDate>Mon, 01 Apr 2024 10:00:00 +0000</pubDate>
+	<language>en-US</language>
+	<wp:wxr_version>1.2</wp:wxr_version>
+	<wp:base_site_url>https://blog.example.com</wp:base_site_url>
+	<wp:base_blog_url>https://blog.example.com</wp:base_blog_url>
+
+	<wp:author><wp:author_id>1</wp:author_id><wp:author_login><![CDATA[anna]]></wp:author_login><wp:author_email><![CDATA[anna@example.com]]></wp:author_email><wp:author_display_name><![CDATA[Anna Example]]></wp:author_display_name><wp:author_first_name><![CDATA[Anna]]></wp:author_first_name><wp:author_last_name><![CDATA[Example]]></wp:author_last_name></wp:author>
+	<wp:author><wp:author_id>2</wp:author_id><wp:author_login><![CDATA[ben]]></wp:author_login><wp:author_email><![CDATA[ben@example.com]]></wp:author_email><wp:author_display_name><![CDATA[Ben Sample]]></wp:author_display_name><wp:author_first_name><![CDATA[]]></wp:author_first_name><wp:author_last_name><![CDATA[]]></wp:author_last_name></wp:author>
+
+	<wp:category><wp:term_id>2</wp:term_id><wp:category_nicename><![CDATA[news]]></wp:category_nicename><wp:category_parent><![CDATA[]]></wp:category_parent><wp:cat_name><![CDATA[News]]></wp:cat_name></wp:category>
+	<wp:category><wp:term_id>4</wp:term_id><wp:category_nicename><![CDATA[bread]]></wp:category_nicename><wp:category_parent><![CDATA[recipes]]></wp:category_parent><wp:cat_name><![CDATA[Bread]]></wp:cat_name></wp:category>
+	<wp:category><wp:term_id>3</wp:term_id><wp:category_nicename><![CDATA[recipes]]></wp:category_nicename><wp:category_parent><![CDATA[]]></wp:category_parent><wp:cat_name><![CDATA[Recipes &amp; Baking]]></wp:cat_name><wp:category_description><![CDATA[Everything we bake]]></wp:category_description></wp:category>
+	<wp:tag><wp:term_id>5</wp:term_id><wp:tag_slug><![CDATA[sourdough]]></wp:tag_slug><wp:tag_name><![CDATA[Sourdough]]></wp:tag_name></wp:tag>
+	<wp:tag><wp:term_id>6</wp:term_id><wp:tag_slug><![CDATA[tips]]></wp:tag_slug><wp:tag_name><![CDATA[Tips]]></wp:tag_name></wp:tag>
+	<wp:term><wp:term_id>7</wp:term_id><wp:term_taxonomy><![CDATA[nav_menu]]></wp:term_taxonomy><wp:term_slug><![CDATA[main-menu]]></wp:term_slug><wp:term_name><![CDATA[Main menu]]></wp:term_name></wp:term>
+
+	<generator>https://wordpress.org/?v=6.6</generator>
+
+	<item>
+		<title><![CDATA[Hello Sourdough]]></title>
+		<link>https://blog.example.com/2024/01/15/hello-sourdough/</link>
+		<pubDate>Mon, 15 Jan 2024 09:30:00 +0000</pubDate>
+		<dc:creator><![CDATA[anna]]></dc:creator>
+		<guid isPermaLink="false">https://blog.example.com/?p=10</guid>
+		<description></description>
+		<content:encoded><![CDATA[<!-- wp:paragraph -->
+<p>Welcome to our <strong>first</strong> post about <em>sourdough</em>. Read the <a href="https://blog.example.com/2024/02/01/bakery-news/">bakery news</a> or learn <a href="https://blog.example.com/about/">about us</a>.</p>
+<!-- /wp:paragraph -->
+
+<!-- wp:heading -->
+<h2 class="wp-block-heading">What you need</h2>
+<!-- /wp:heading -->
+
+<!-- wp:list -->
+<ul class="wp-block-list"><!-- wp:list-item -->
+<li>Flour</li>
+<!-- /wp:list-item -->
+
+<!-- wp:list-item -->
+<li>Water and salt</li>
+<!-- /wp:list-item --></ul>
+<!-- /wp:list -->
+
+<!-- wp:image {"id":102,"sizeSlug":"medium","linkDestination":"none"} -->
+<figure class="wp-block-image size-medium"><img src="https://blog.example.com/wp-content/uploads/2024/01/loaf-300x200.png" alt="A fresh loaf" class="wp-image-102"/><figcaption class="wp-element-caption">Our first loaf</figcaption></figure>
+<!-- /wp:image -->
+
+<!-- wp:quote -->
+<blockquote class="wp-block-quote"><!-- wp:paragraph -->
+<p>Bread is patience you can eat.</p>
+<!-- /wp:paragraph --><cite>A made-up baker</cite></blockquote>
+<!-- /wp:quote -->
+
+<!-- wp:code -->
+<pre class="wp-block-code"><code>hydration = water / flour</code></pre>
+<!-- /wp:code -->
+
+<!-- wp:preformatted -->
+<pre class="wp-block-preformatted">Day 1: feed
+Day 2: bake</pre>
+<!-- /wp:preformatted -->
+
+<!-- wp:separator -->
+<hr class="wp-block-separator has-alpha-channel-opacity"/>
+<!-- /wp:separator -->
+
+<!-- wp:buttons -->
+<div class="wp-block-buttons"><!-- wp:button -->
+<div class="wp-block-button"><a class="wp-block-button__link wp-element-button" href="https://blog.example.com/contact/">Order now</a></div>
+<!-- /wp:button --></div>
+<!-- /wp:buttons -->
+
+<!-- wp:embed {"url":"https://www.youtube.com/watch?v=abc123XYZ00","type":"video","providerNameSlug":"youtube","responsive":true} -->
+<figure class="wp-block-embed is-type-video is-provider-youtube wp-block-embed-youtube"><div class="wp-block-embed__wrapper">
+https://www.youtube.com/watch?v=abc123XYZ00
+</div></figure>
+<!-- /wp:embed -->
+
+<!-- wp:table -->
+<figure class="wp-block-table"><table><thead><tr><th>Ingredient</th><th>Grams</th></tr></thead><tbody><tr><td>Flour</td><td>500</td></tr><tr><td>Water</td><td>350</td></tr></tbody></table></figure>
+<!-- /wp:table -->
+
+<!-- wp:gallery {"linkTo":"none"} -->
+<figure class="wp-block-gallery has-nested-images columns-default is-cropped"><!-- wp:image {"id":102,"sizeSlug":"large"} -->
+<figure class="wp-block-image size-large"><img src="https://blog.example.com/wp-content/uploads/2024/01/loaf.png" alt="" class="wp-image-102"/></figure>
+<!-- /wp:image -->
+
+<!-- wp:image {"id":103,"sizeSlug":"large"} -->
+<figure class="wp-block-image size-large"><img src="http://blog.example.com/wp-content/uploads/2024/02/croissant.png" alt="Croissant" class="wp-image-103"/></figure>
+<!-- /wp:image --></figure>
+<!-- /wp:gallery -->
+
+<!-- wp:columns -->
+<div class="wp-block-columns"><!-- wp:column -->
+<div class="wp-block-column"><!-- wp:paragraph -->
+<p>Left column text.</p>
+<!-- /wp:paragraph --></div>
+<!-- /wp:column -->
+
+<!-- wp:column -->
+<div class="wp-block-column"><!-- wp:group {"layout":{"type":"constrained"}} -->
+<div class="wp-block-group"><!-- wp:paragraph -->
+<p>Grouped right column text.</p>
+<!-- /wp:paragraph --></div>
+<!-- /wp:group --></div>
+<!-- /wp:column --></div>
+<!-- /wp:columns -->
+
+<!-- wp:latest-posts {"postsToShow":3} /-->]]></content:encoded>
+		<excerpt:encoded><![CDATA[Our first post about sourdough.]]></excerpt:encoded>
+		<wp:post_id>10</wp:post_id>
+		<wp:post_date><![CDATA[2024-01-15 10:30:00]]></wp:post_date>
+		<wp:post_date_gmt><![CDATA[2024-01-15 09:30:00]]></wp:post_date_gmt>
+		<wp:post_modified><![CDATA[2024-03-01 12:00:00]]></wp:post_modified>
+		<wp:post_modified_gmt><![CDATA[2024-03-01 11:00:00]]></wp:post_modified_gmt>
+		<wp:comment_status><![CDATA[open]]></wp:comment_status>
+		<wp:ping_status><![CDATA[open]]></wp:ping_status>
+		<wp:post_name><![CDATA[hello-sourdough]]></wp:post_name>
+		<wp:status><![CDATA[publish]]></wp:status>
+		<wp:post_parent>0</wp:post_parent>
+		<wp:menu_order>0</wp:menu_order>
+		<wp:post_type><![CDATA[post]]></wp:post_type>
+		<wp:post_password><![CDATA[]]></wp:post_password>
+		<wp:is_sticky>1</wp:is_sticky>
+		<category domain="category" nicename="bread"><![CDATA[Bread]]></category>
+		<category domain="category" nicename="recipes"><![CDATA[Recipes &amp; Baking]]></category>
+		<category domain="post_tag" nicename="sourdough"><![CDATA[Sourdough]]></category>
+		<wp:postmeta><wp:meta_key><![CDATA[_thumbnail_id]]></wp:meta_key><wp:meta_value><![CDATA[101]]></wp:meta_value></wp:postmeta>
+		<wp:postmeta><wp:meta_key><![CDATA[_wp_old_slug]]></wp:meta_key><wp:meta_value><![CDATA[hello-world]]></wp:meta_value></wp:postmeta>
+		<wp:postmeta><wp:meta_key><![CDATA[_wp_old_slug]]></wp:meta_key><wp:meta_value><![CDATA[first-post]]></wp:meta_value></wp:postmeta>
+		<wp:postmeta><wp:meta_key><![CDATA[_yoast_wpseo_title]]></wp:meta_key><wp:meta_value><![CDATA[%%title%% %%sep%% %%sitename%%]]></wp:meta_value></wp:postmeta>
+		<wp:postmeta><wp:meta_key><![CDATA[_yoast_wpseo_metadesc]]></wp:meta_key><wp:meta_value><![CDATA[Learn to bake your first sourdough loaf.]]></wp:meta_value></wp:postmeta>
+		<wp:postmeta><wp:meta_key><![CDATA[_yoast_wpseo_canonical]]></wp:meta_key><wp:meta_value><![CDATA[https://other.example.org/sourdough-guide/]]></wp:meta_value></wp:postmeta>
+		<wp:postmeta><wp:meta_key><![CDATA[_yoast_wpseo_opengraph-image-id]]></wp:meta_key><wp:meta_value><![CDATA[102]]></wp:meta_value></wp:postmeta>
+		<wp:comment>
+			<wp:comment_id>1</wp:comment_id>
+			<wp:comment_author><![CDATA[A Reader]]></wp:comment_author>
+			<wp:comment_content><![CDATA[Looks tasty!]]></wp:comment_content>
+			<wp:comment_approved><![CDATA[1]]></wp:comment_approved>
+		</wp:comment>
+		<wp:comment>
+			<wp:comment_id>2</wp:comment_id>
+			<wp:comment_author><![CDATA[Another Reader]]></wp:comment_author>
+			<wp:comment_content><![CDATA[Thanks for the recipe.]]></wp:comment_content>
+			<wp:comment_approved><![CDATA[1]]></wp:comment_approved>
+		</wp:comment>
+	</item>
+
+	<item>
+		<title><![CDATA[Bakery News]]></title>
+		<link>https://blog.example.com/2024/02/01/bakery-news/</link>
+		<pubDate>Thu, 01 Feb 2024 08:00:00 +0000</pubDate>
+		<dc:creator><![CDATA[ben]]></dc:creator>
+		<guid isPermaLink="false">https://blog.example.com/?p=11</guid>
+		<description></description>
+		<content:encoded><![CDATA[We have news! Our shop opens <strong>earlier</strong> from March.
+
+[caption id="attachment_103" align="aligncenter" width="300"]<img class="size-medium wp-image-103" src="https://blog.example.com/wp-content/uploads/2024/02/croissant-300x300.png" alt="Croissant" width="300" height="300" /> Fresh croissants every morning[/caption]
+
+See the <a href="/2024/01/15/hello-sourdough/">sourdough post</a> and our [contact-form-7 id="5" title="Contact"] form.
+
+Line one
+line two]]></content:encoded>
+		<excerpt:encoded><![CDATA[]]></excerpt:encoded>
+		<wp:post_id>11</wp:post_id>
+		<wp:post_date><![CDATA[2024-02-01 09:00:00]]></wp:post_date>
+		<wp:post_date_gmt><![CDATA[2024-02-01 08:00:00]]></wp:post_date_gmt>
+		<wp:post_modified><![CDATA[2024-02-01 09:00:00]]></wp:post_modified>
+		<wp:post_modified_gmt><![CDATA[2024-02-01 08:00:00]]></wp:post_modified_gmt>
+		<wp:post_name><![CDATA[bakery-news]]></wp:post_name>
+		<wp:status><![CDATA[publish]]></wp:status>
+		<wp:post_parent>0</wp:post_parent>
+		<wp:menu_order>0</wp:menu_order>
+		<wp:post_type><![CDATA[post]]></wp:post_type>
+		<wp:post_password><![CDATA[]]></wp:post_password>
+		<wp:is_sticky>0</wp:is_sticky>
+		<category domain="category" nicename="news"><![CDATA[News]]></category>
+		<category domain="post_tag" nicename="tips"><![CDATA[Tips]]></category>
+		<wp:postmeta><wp:meta_key><![CDATA[_yoast_wpseo_metadesc]]></wp:meta_key><wp:meta_value><![CDATA[Opening hours change in %%currentmonth%%.]]></wp:meta_value></wp:postmeta>
+	</item>
+
+	<item>
+		<title><![CDATA[Upcoming Recipe]]></title>
+		<link>https://blog.example.com/?p=12</link>
+		<pubDate>Mon, 01 Apr 2024 10:00:00 +0000</pubDate>
+		<dc:creator><![CDATA[anna]]></dc:creator>
+		<guid isPermaLink="false">https://blog.example.com/?p=12</guid>
+		<description></description>
+		<content:encoded><![CDATA[<!-- wp:paragraph -->
+<p>Coming soon.</p>
+<!-- /wp:paragraph -->]]></content:encoded>
+		<excerpt:encoded><![CDATA[]]></excerpt:encoded>
+		<wp:post_id>12</wp:post_id>
+		<wp:post_date><![CDATA[2024-04-01 12:00:00]]></wp:post_date>
+		<wp:post_date_gmt><![CDATA[0000-00-00 00:00:00]]></wp:post_date_gmt>
+		<wp:post_modified><![CDATA[2024-04-01 12:00:00]]></wp:post_modified>
+		<wp:post_modified_gmt><![CDATA[2024-04-01 10:00:00]]></wp:post_modified_gmt>
+		<wp:post_name><![CDATA[]]></wp:post_name>
+		<wp:status><![CDATA[draft]]></wp:status>
+		<wp:post_parent>0</wp:post_parent>
+		<wp:menu_order>0</wp:menu_order>
+		<wp:post_type><![CDATA[post]]></wp:post_type>
+		<wp:post_password><![CDATA[]]></wp:post_password>
+		<wp:is_sticky>0</wp:is_sticky>
+		<category domain="category" nicename="recipes"><![CDATA[Recipes &amp; Baking]]></category>
+	</item>
+
+	<item>
+		<title><![CDATA[Deleted Post]]></title>
+		<link>https://blog.example.com/2024/01/10/deleted-post/</link>
+		<pubDate>Wed, 10 Jan 2024 10:00:00 +0000</pubDate>
+		<dc:creator><![CDATA[anna]]></dc:creator>
+		<guid isPermaLink="false">https://blog.example.com/?p=13</guid>
+		<description></description>
+		<content:encoded><![CDATA[<p>Gone.</p>]]></content:encoded>
+		<excerpt:encoded><![CDATA[]]></excerpt:encoded>
+		<wp:post_id>13</wp:post_id>
+		<wp:post_date><![CDATA[2024-01-10 11:00:00]]></wp:post_date>
+		<wp:post_date_gmt><![CDATA[2024-01-10 10:00:00]]></wp:post_date_gmt>
+		<wp:post_modified><![CDATA[2024-01-10 11:00:00]]></wp:post_modified>
+		<wp:post_modified_gmt><![CDATA[2024-01-10 10:00:00]]></wp:post_modified_gmt>
+		<wp:post_name><![CDATA[deleted-post__trashed]]></wp:post_name>
+		<wp:status><![CDATA[trash]]></wp:status>
+		<wp:post_parent>0</wp:post_parent>
+		<wp:menu_order>0</wp:menu_order>
+		<wp:post_type><![CDATA[post]]></wp:post_type>
+		<wp:post_password><![CDATA[]]></wp:post_password>
+		<wp:is_sticky>0</wp:is_sticky>
+	</item>
+
+	<item>
+		<title><![CDATA[About]]></title>
+		<link>https://blog.example.com/about/</link>
+		<pubDate>Mon, 01 Jan 2024 10:00:00 +0000</pubDate>
+		<dc:creator><![CDATA[anna]]></dc:creator>
+		<guid isPermaLink="false">https://blog.example.com/?page_id=20</guid>
+		<description></description>
+		<content:encoded><![CDATA[<!-- wp:paragraph -->
+<p>We are a made-up bakery. Meet <a href="https://blog.example.com/about/team/">the team</a>.</p>
+<!-- /wp:paragraph -->]]></content:encoded>
+		<excerpt:encoded><![CDATA[]]></excerpt:encoded>
+		<wp:post_id>20</wp:post_id>
+		<wp:post_date><![CDATA[2024-01-01 11:00:00]]></wp:post_date>
+		<wp:post_date_gmt><![CDATA[2024-01-01 10:00:00]]></wp:post_date_gmt>
+		<wp:post_modified><![CDATA[2024-01-01 11:00:00]]></wp:post_modified>
+		<wp:post_modified_gmt><![CDATA[2024-01-01 10:00:00]]></wp:post_modified_gmt>
+		<wp:post_name><![CDATA[about]]></wp:post_name>
+		<wp:status><![CDATA[publish]]></wp:status>
+		<wp:post_parent>0</wp:post_parent>
+		<wp:menu_order>1</wp:menu_order>
+		<wp:post_type><![CDATA[page]]></wp:post_type>
+		<wp:post_password><![CDATA[]]></wp:post_password>
+		<wp:is_sticky>0</wp:is_sticky>
+		<wp:postmeta><wp:meta_key><![CDATA[_wp_page_template]]></wp:meta_key><wp:meta_value><![CDATA[default]]></wp:meta_value></wp:postmeta>
+		<wp:postmeta><wp:meta_key><![CDATA[_yoast_wpseo_title]]></wp:meta_key><wp:meta_value><![CDATA[About our bakery %%sep%% %%sitename%%]]></wp:meta_value></wp:postmeta>
+	</item>
+
+	<item>
+		<title><![CDATA[Team]]></title>
+		<link>https://blog.example.com/about/team/</link>
+		<pubDate>Tue, 02 Jan 2024 10:00:00 +0000</pubDate>
+		<dc:creator><![CDATA[ben]]></dc:creator>
+		<guid isPermaLink="false">https://blog.example.com/?page_id=21</guid>
+		<description></description>
+		<content:encoded><![CDATA[<!-- wp:paragraph -->
+<p>Anna bakes, Ben sells.</p>
+<!-- /wp:paragraph -->
+
+<!-- wp:image {"id":101} -->
+<figure class="wp-block-image"><img src="https://blog.example.com/wp-content/uploads/2024/01/hero-scaled.png" alt="" class="wp-image-101"/></figure>
+<!-- /wp:image -->]]></content:encoded>
+		<excerpt:encoded><![CDATA[]]></excerpt:encoded>
+		<wp:post_id>21</wp:post_id>
+		<wp:post_date><![CDATA[2024-01-02 11:00:00]]></wp:post_date>
+		<wp:post_date_gmt><![CDATA[2024-01-02 10:00:00]]></wp:post_date_gmt>
+		<wp:post_modified><![CDATA[2024-01-02 11:00:00]]></wp:post_modified>
+		<wp:post_modified_gmt><![CDATA[2024-01-02 10:00:00]]></wp:post_modified_gmt>
+		<wp:post_name><![CDATA[team]]></wp:post_name>
+		<wp:status><![CDATA[publish]]></wp:status>
+		<wp:post_parent>20</wp:post_parent>
+		<wp:menu_order>0</wp:menu_order>
+		<wp:post_type><![CDATA[page]]></wp:post_type>
+		<wp:post_password><![CDATA[]]></wp:post_password>
+		<wp:is_sticky>0</wp:is_sticky>
+	</item>
+
+	<item>
+		<title><![CDATA[Contact]]></title>
+		<link>https://blog.example.com/contact/</link>
+		<pubDate>Tue, 02 Jan 2024 10:00:00 +0000</pubDate>
+		<dc:creator><![CDATA[anna]]></dc:creator>
+		<guid isPermaLink="false">https://blog.example.com/?page_id=22</guid>
+		<description></description>
+		<content:encoded><![CDATA[<!-- wp:paragraph -->
+<p>Write to hello@example.com.</p>
+<!-- /wp:paragraph -->]]></content:encoded>
+		<excerpt:encoded><![CDATA[]]></excerpt:encoded>
+		<wp:post_id>22</wp:post_id>
+		<wp:post_date><![CDATA[2024-01-02 11:00:00]]></wp:post_date>
+		<wp:post_date_gmt><![CDATA[2024-01-02 10:00:00]]></wp:post_date_gmt>
+		<wp:post_modified><![CDATA[2024-01-02 11:00:00]]></wp:post_modified>
+		<wp:post_modified_gmt><![CDATA[2024-01-02 10:00:00]]></wp:post_modified_gmt>
+		<wp:post_name><![CDATA[contact]]></wp:post_name>
+		<wp:status><![CDATA[publish]]></wp:status>
+		<wp:post_parent>0</wp:post_parent>
+		<wp:menu_order>2</wp:menu_order>
+		<wp:post_type><![CDATA[page]]></wp:post_type>
+		<wp:post_password><![CDATA[]]></wp:post_password>
+		<wp:is_sticky>0</wp:is_sticky>
+	</item>
+
+	<item>
+		<title><![CDATA[Hero]]></title>
+		<link>https://blog.example.com/2024/01/15/hello-sourdough/hero/</link>
+		<pubDate>Mon, 15 Jan 2024 09:00:00 +0000</pubDate>
+		<dc:creator><![CDATA[anna]]></dc:creator>
+		<guid isPermaLink="false">https://blog.example.com/wp-content/uploads/2024/01/hero.png</guid>
+		<description></description>
+		<content:encoded><![CDATA[]]></content:encoded>
+		<excerpt:encoded><![CDATA[Morning light in the bakery]]></excerpt:encoded>
+		<wp:post_id>101</wp:post_id>
+		<wp:post_date><![CDATA[2024-01-15 10:00:00]]></wp:post_date>
+		<wp:post_date_gmt><![CDATA[2024-01-15 09:00:00]]></wp:post_date_gmt>
+		<wp:post_modified><![CDATA[2024-01-15 10:00:00]]></wp:post_modified>
+		<wp:post_modified_gmt><![CDATA[2024-01-15 09:00:00]]></wp:post_modified_gmt>
+		<wp:post_name><![CDATA[hero]]></wp:post_name>
+		<wp:status><![CDATA[inherit]]></wp:status>
+		<wp:post_parent>10</wp:post_parent>
+		<wp:menu_order>0</wp:menu_order>
+		<wp:post_type><![CDATA[attachment]]></wp:post_type>
+		<wp:post_password><![CDATA[]]></wp:post_password>
+		<wp:is_sticky>0</wp:is_sticky>
+		<wp:attachment_url><![CDATA[https://blog.example.com/wp-content/uploads/2024/01/hero.png]]></wp:attachment_url>
+		<wp:postmeta><wp:meta_key><![CDATA[_wp_attached_file]]></wp:meta_key><wp:meta_value><![CDATA[2024/01/hero.png]]></wp:meta_value></wp:postmeta>
+		<wp:postmeta><wp:meta_key><![CDATA[_wp_attachment_image_alt]]></wp:meta_key><wp:meta_value><![CDATA[Bakery counter at sunrise]]></wp:meta_value></wp:postmeta>
+	</item>
+
+	<item>
+		<title><![CDATA[Loaf]]></title>
+		<link>https://blog.example.com/2024/01/15/hello-sourdough/loaf/</link>
+		<pubDate>Mon, 15 Jan 2024 09:00:00 +0000</pubDate>
+		<dc:creator><![CDATA[anna]]></dc:creator>
+		<guid isPermaLink="false">https://blog.example.com/wp-content/uploads/2024/01/loaf.png</guid>
+		<description></description>
+		<content:encoded><![CDATA[]]></content:encoded>
+		<excerpt:encoded><![CDATA[]]></excerpt:encoded>
+		<wp:post_id>102</wp:post_id>
+		<wp:post_date><![CDATA[2024-01-15 10:00:00]]></wp:post_date>
+		<wp:post_date_gmt><![CDATA[2024-01-15 09:00:00]]></wp:post_date_gmt>
+		<wp:post_modified><![CDATA[2024-01-15 10:00:00]]></wp:post_modified>
+		<wp:post_modified_gmt><![CDATA[2024-01-15 09:00:00]]></wp:post_modified_gmt>
+		<wp:post_name><![CDATA[loaf]]></wp:post_name>
+		<wp:status><![CDATA[inherit]]></wp:status>
+		<wp:post_parent>10</wp:post_parent>
+		<wp:menu_order>0</wp:menu_order>
+		<wp:post_type><![CDATA[attachment]]></wp:post_type>
+		<wp:post_password><![CDATA[]]></wp:post_password>
+		<wp:is_sticky>0</wp:is_sticky>
+		<wp:attachment_url><![CDATA[https://blog.example.com/wp-content/uploads/2024/01/loaf.png]]></wp:attachment_url>
+		<wp:postmeta><wp:meta_key><![CDATA[_wp_attached_file]]></wp:meta_key><wp:meta_value><![CDATA[2024/01/loaf.png]]></wp:meta_value></wp:postmeta>
+		<wp:postmeta><wp:meta_key><![CDATA[_wp_attachment_image_alt]]></wp:meta_key><wp:meta_value><![CDATA[A fresh loaf]]></wp:meta_value></wp:postmeta>
+	</item>
+
+	<item>
+		<title><![CDATA[Croissant]]></title>
+		<link>https://blog.example.com/croissant/</link>
+		<pubDate>Thu, 01 Feb 2024 07:00:00 +0000</pubDate>
+		<dc:creator><![CDATA[ben]]></dc:creator>
+		<guid isPermaLink="false">https://blog.example.com/wp-content/uploads/2024/02/croissant.png</guid>
+		<description></description>
+		<content:encoded><![CDATA[]]></content:encoded>
+		<excerpt:encoded><![CDATA[]]></excerpt:encoded>
+		<wp:post_id>103</wp:post_id>
+		<wp:post_date><![CDATA[2024-02-01 08:00:00]]></wp:post_date>
+		<wp:post_date_gmt><![CDATA[2024-02-01 07:00:00]]></wp:post_date_gmt>
+		<wp:post_modified><![CDATA[2024-02-01 08:00:00]]></wp:post_modified>
+		<wp:post_modified_gmt><![CDATA[2024-02-01 07:00:00]]></wp:post_modified_gmt>
+		<wp:post_name><![CDATA[croissant]]></wp:post_name>
+		<wp:status><![CDATA[inherit]]></wp:status>
+		<wp:post_parent>0</wp:post_parent>
+		<wp:menu_order>0</wp:menu_order>
+		<wp:post_type><![CDATA[attachment]]></wp:post_type>
+		<wp:post_password><![CDATA[]]></wp:post_password>
+		<wp:is_sticky>0</wp:is_sticky>
+		<wp:attachment_url><![CDATA[https://blog.example.com/wp-content/uploads/2024/02/croissant.png]]></wp:attachment_url>
+		<wp:postmeta><wp:meta_key><![CDATA[_wp_attached_file]]></wp:meta_key><wp:meta_value><![CDATA[2024/02/croissant.png]]></wp:meta_value></wp:postmeta>
+	</item>
+
+	<item>
+		<title><![CDATA[Home]]></title>
+		<link>https://blog.example.com/?p=30</link>
+		<pubDate>Mon, 01 Jan 2024 10:00:00 +0000</pubDate>
+		<dc:creator><![CDATA[anna]]></dc:creator>
+		<guid isPermaLink="false">https://blog.example.com/?p=30</guid>
+		<description></description>
+		<content:encoded><![CDATA[ ]]></content:encoded>
+		<excerpt:encoded><![CDATA[]]></excerpt:encoded>
+		<wp:post_id>30</wp:post_id>
+		<wp:post_date><![CDATA[2024-01-01 11:00:00]]></wp:post_date>
+		<wp:post_date_gmt><![CDATA[2024-01-01 10:00:00]]></wp:post_date_gmt>
+		<wp:post_name><![CDATA[home]]></wp:post_name>
+		<wp:status><![CDATA[publish]]></wp:status>
+		<wp:post_parent>0</wp:post_parent>
+		<wp:menu_order>1</wp:menu_order>
+		<wp:post_type><![CDATA[nav_menu_item]]></wp:post_type>
+		<category domain="nav_menu" nicename="main-menu"><![CDATA[Main menu]]></category>
+	</item>
+
+	<item>
+		<title><![CDATA[Rye Bread]]></title>
+		<link>https://blog.example.com/recipe/rye-bread/</link>
+		<pubDate>Mon, 05 Feb 2024 10:00:00 +0000</pubDate>
+		<dc:creator><![CDATA[anna]]></dc:creator>
+		<guid isPermaLink="false">https://blog.example.com/?post_type=recipe&amp;p=40</guid>
+		<description></description>
+		<content:encoded><![CDATA[<!-- wp:paragraph -->
+<p>A custom post type entry.</p>
+<!-- /wp:paragraph -->]]></content:encoded>
+		<excerpt:encoded><![CDATA[]]></excerpt:encoded>
+		<wp:post_id>40</wp:post_id>
+		<wp:post_date><![CDATA[2024-02-05 11:00:00]]></wp:post_date>
+		<wp:post_date_gmt><![CDATA[2024-02-05 10:00:00]]></wp:post_date_gmt>
+		<wp:post_name><![CDATA[rye-bread]]></wp:post_name>
+		<wp:status><![CDATA[publish]]></wp:status>
+		<wp:post_parent>0</wp:post_parent>
+		<wp:menu_order>0</wp:menu_order>
+		<wp:post_type><![CDATA[recipe]]></wp:post_type>
+	</item>
+</channel>
+</rss>
