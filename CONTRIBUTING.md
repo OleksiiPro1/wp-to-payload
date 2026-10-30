@@ -103,6 +103,9 @@ configured in the package's settings on npmjs.com.
 
 4. Create a GitHub release from the tag with the changelog entry.
 
+A tag for a version that is already on npm (for example `v0.1.0`, published by hand) ends the
+workflow without publishing, so such tags can be added for the history.
+
 If the workflow fails before publishing, fix the problem on `main` through a pull request,
 delete the tag (`git push origin :refs/tags/v0.2.0` and `git tag -d v0.2.0`) and tag again.
 A version that reached npm cannot be published again; release the next patch version instead.

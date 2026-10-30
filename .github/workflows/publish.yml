@@ -35,12 +35,28 @@ jobs:
         run: npm install --global npm@^11.5.1
       - name: Check versions, tag and branch
         run: node scripts/check-release.mjs
-      - run: npm ci
-      - run: npm run lint
-      - run: npm run typecheck
-      - run: npm test
-      - run: npm run build
+      # A version can be published only once; tagging a version that is already on npm (such
+      # as 0.1.0, published by hand) ends the run here instead of failing.
+      - name: Skip versions that are already on npm
+        id: npm
+        run: |
+          spec="$(node -p "const p = require('./package.json'); p.name + '@' + p.version")"
+          if npm view "$spec" version > /dev/null 2>&1; then
+            echo "::notice::$spec is already on npm; nothing to publish."
+            echo "published=true" >> "$GITHUB_OUTPUT"
+          fi
+      - if: steps.npm.outputs.published != 'true'
+        run: npm ci
+      - if: steps.npm.outputs.published != 'true'
+        run: npm run lint
+      - if: steps.npm.outputs.published != 'true'
+        run: npm run typecheck
+      - if: steps.npm.outputs.published != 'true'
+        run: npm test
+      - if: steps.npm.outputs.published != 'true'
+        run: npm run build
       - name: Publish to npm
+        if: steps.npm.outputs.published != 'true'
         run: |
           version="$(node -p "require('./package.json').version")"
           dist_tag=latest
