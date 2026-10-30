@@ -102,7 +102,7 @@ describe('readWxr', () => {
   })
 
   it('joins split CDATA sections and strips a byte order mark', async () => {
-    const xml = `﻿${wxr(
+    const xml = `\uFEFF${wxr(
       `<item><title>A</title><content:encoded><![CDATA[a]]]]><![CDATA[>b]]></content:encoded><wp:post_id>1</wp:post_id></item>`,
     )}`
     const { records, issues } = await collect(fromString(xml))
