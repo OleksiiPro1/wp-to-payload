@@ -84,7 +84,10 @@ writing anything.
 | Custom fields of posts and custom post types (ACF, other post meta)                                                              | Not imported yet                                                                                    | ❌  |
 | Comments, menus                                                                                                                  | Counted and reported, not imported                                                                  | ❌  |
 | Post types of plugins: forms and their entries, page builder templates, ACF settings                                             | Listed in the reports, never imported                                                               | ❌  |
-| WPML, Polylang, WooCommerce, ACF                                                                                                 | Detected and reported, not imported                                                                 | ❌  |
+| Polylang: languages and translations of posts, pages, custom post types, terms and images                                        | One document per translation group, texts per Payload locale; redirects per language                | ✅  |
+| WPML with its WPML Export and Import add-on (experimental)                                                                       | As for Polylang, from the add-on's documented post meta                                             | ⚠️  |
+| WPML without the add-on                                                                                                          | Languages from the URL directories, translations stay separate documents                            | ⚠️  |
+| WooCommerce, ACF                                                                                                                 | Detected and reported, not imported                                                                 | ❌  |
 | All in One SEO, SEOPress                                                                                                         | Detected only                                                                                       | ❌  |
 | Users, passwords, roles                                                                                                          | Never imported                                                                                      | ❌  |
 
@@ -196,13 +199,14 @@ New URLs come from patterns. The defaults match the
 posts at `/posts/:slug`, pages at `/:slug`. Custom post types get the plural of their name:
 `/recipes/:slug`, or `/guides/:path` for hierarchical types.
 
-| Token                     | Value                                                     |
-| ------------------------- | --------------------------------------------------------- |
-| `:slug`                   | The item's slug                                           |
-| `:path`                   | Slugs of the parent pages and the page, e.g. `about/team` |
-| `:year`, `:month`, `:day` | Publication date                                          |
-| `:category`               | First category with its parents, e.g. `recipes/bread`     |
-| `:id`                     | WordPress ID                                              |
+| Token                     | Value                                                                    |
+| ------------------------- | ------------------------------------------------------------------------ |
+| `:slug`                   | The item's slug                                                          |
+| `:path`                   | Slugs of the parent pages and the page, e.g. `about/team`                |
+| `:year`, `:month`, `:day` | Publication date                                                         |
+| `:category`               | First category with its parents, e.g. `recipes/bread`                    |
+| `:id`                     | WordPress ID                                                             |
+| `:locale`                 | Language directory on multilingual sites, empty for the default language |
 
 ```bash
 npx wp-to-payload redirects export.xml --post-path /blog/:slug --page-path /:path --category-path /blog/category/:path
@@ -229,7 +233,8 @@ project root. Everything is optional:
   },
   "seo": { "separator": "|" },
   "media": { "hosts": ["cdn.example.com"] },
-  "importAuthorEmails": false
+  "importAuthorEmails": false,
+  "localization": { "defaultLanguage": "de", "locales": { "de": "de", "en": "en" } }
 }
 ```
 
@@ -251,6 +256,35 @@ project root. Everything is optional:
 - `media.hosts`: hosts media may be downloaded from besides the site.
 - `importAuthorEmails`: copy author e-mail addresses. Off by default, because they are
   personal data.
+- `localization`, for multilingual sites: `defaultLanguage`, the WordPress code of the default
+  language (otherwise the one whose URLs have no language directory); `locales`, WordPress
+  language → Payload locale where the codes differ; `prefixDefaultLanguage`, to give the
+  default language a directory in new URLs too.
+
+## Multilingual sites
+
+Polylang keeps languages and translations in the export, so `analyze` shows the languages, the
+items per language and how complete the translations are, `scaffold export.xml` writes
+collections with localized fields and prints the `localization` block for `payload.config.ts`,
+and `import` turns each translation group into one document with a value per locale:
+
+- Localized: title, slug, content, excerpt, featured image, the SEO fields; for terms title,
+  slug and description; for media alt text and caption. Relations, the author and the date come
+  from the default language's version.
+- `wpId` is the smallest WordPress ID of the group and `wpIds` holds all of them, so a later
+  import, also with a translation that is new, updates the same document.
+- The default language keeps URLs without a language directory (`/ueber-uns`), others get theirs
+  (`/en/about-us`); old URLs of every language are redirected.
+- Payload publishes all locales of a document together. A version that is not public in
+  WordPress while another one is stays out (`TRANSLATION_DRAFT`).
+- Without `localization` in Payload only the default language is imported, and the report says
+  so.
+
+**WPML** support is experimental. WPML keeps languages in its own tables, which the export does
+not contain; only its WPML Export and Import add-on writes
+them into the export (`_wpml_import_language_code`, `_wpml_import_source_language_code`,
+`_wpml_import_translation_group`). Only these documented keys are read. Without them the
+language of an item comes from its URL directory and translations stay separate documents.
 
 ## Limitations
 
@@ -278,7 +312,6 @@ project root. Everything is optional:
 
 ## Roadmap
 
-- WPML and Polylang to Payload localization
 - WooCommerce products
 - ACF fields
 - Comments and menus
