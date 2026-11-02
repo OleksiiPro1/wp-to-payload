@@ -3,9 +3,16 @@ import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises'
 import { dirname, join, relative, resolve, sep } from 'node:path'
 import { type Command, stringOption, UsageError } from '../cli/command.js'
 import { info, out, paint, success, warn } from '../cli/output.js'
-import { CONFIG_FILE, type CollectionSlugs, loadConfig } from '../config.js'
+import { CONFIG_FILE, type CollectionSlugs, type Config, loadConfig } from '../config.js'
 import { findPackageDir } from '../import/project.js'
-import { configSnippet, scaffoldFiles } from '../scaffold/templates.js'
+import {
+  configSnippet,
+  type ScaffoldCustom,
+  type ScaffoldRelation,
+  scaffoldFiles,
+} from '../scaffold/templates.js'
+import { EMPTY_SURVEY, resolveSiteTypes, type SiteTypes, surveyIndex } from '../site-types.js'
+import { buildSiteIndex } from '../wxr/site-index.js'
 
 const SKIP_DIRS = new Set(['node_modules', '.next', '.git', 'dist', 'build', '.turbo'])
 
@@ -47,12 +54,87 @@ const importPathFrom = (configFile: string, outDir: string): string => {
   return rel.startsWith('.') ? rel : `./${rel}`
 }
 
+/**
+ * The custom post types and taxonomies to write collections for. Types mapped to a built-in
+ * collection (`postTypes.news.collection: "posts"`) need no file of their own.
+ */
+const customCollections = (
+  types: SiteTypes,
+  slugs: CollectionSlugs,
+  prefix: string,
+): ScaffoldCustom => {
+  // `slugs` already has the prefix. A custom type may be mapped to one of these collections,
+  // with or without the prefix; every other collection gets the prefix.
+  const builtin = new Set(Object.values(slugs))
+  const slugOf = (collection: string) => {
+    const prefixed = `${prefix}${collection}`
+    if (builtin.has(prefixed)) return prefixed
+    return builtin.has(collection) ? collection : prefixed
+  }
+  const taxonomy = new Map(types.taxonomies.map((t) => [t.taxonomy, t]))
+  /** Fields for the taxonomies of every type that goes into the collection. */
+  const relationsOf = (collection: string, skipBuiltin: boolean): ScaffoldRelation[] => {
+    const fields = new Map<string, ScaffoldRelation>()
+    for (const type of types.postTypes) {
+      if (slugOf(type.collection) !== collection) continue
+      for (const name of type.taxonomies) {
+        const t = taxonomy.get(name)
+        if (!t || (skipBuiltin && t.builtin) || fields.has(t.field)) continue
+        fields.set(t.field, { field: t.field, collection: slugOf(t.collection) })
+      }
+    }
+    return [...fields.values()]
+  }
+  const seen = new Set<string>()
+  const own = <T extends { collection: string; builtin: boolean }>(list: T[]) =>
+    list.filter((t) => {
+      const slug = slugOf(t.collection)
+      if (t.builtin || builtin.has(slug) || seen.has(slug)) return false
+      seen.add(slug)
+      return true
+    })
+  return {
+    taxonomies: own(types.taxonomies).map((t) => ({
+      slug: slugOf(t.collection),
+      wpName: t.taxonomy,
+      hierarchical: t.hierarchical,
+    })),
+    postTypes: own(types.postTypes).map((t) => ({
+      slug: slugOf(t.collection),
+      wpName: t.wpType,
+      hierarchical: t.hierarchical,
+      relations: relationsOf(slugOf(t.collection), false),
+    })),
+    // The Posts template has categories and tags already.
+    postRelations: relationsOf(slugs.posts, true),
+    pageRelations: relationsOf(slugs.pages, true),
+  }
+}
+
+/** The config settings that point the import to the prefixed collections. */
+const prefixedSettings = (slugs: CollectionSlugs, custom: ScaffoldCustom, config: Config) => {
+  const collections: Partial<CollectionSlugs> = { ...slugs }
+  delete collections.redirects
+  const settings: Record<string, unknown> = { collections }
+  const byName = (list: { wpName: string; slug: string }[], existing: Record<string, object>) =>
+    Object.fromEntries(list.map((c) => [c.wpName, { ...existing[c.wpName], collection: c.slug }]))
+  if (custom.postTypes.length > 0) settings.postTypes = byName(custom.postTypes, config.postTypes)
+  if (custom.taxonomies.length > 0) {
+    settings.taxonomies = byName(custom.taxonomies, config.taxonomies)
+  }
+  return settings
+}
+
 export const scaffoldCommand: Command = {
   name: 'scaffold',
   summary:
-    'Write Payload collections (Posts, Pages, Categories, Tags, Authors, Media) for the import.',
-  usage: 'scaffold [--out <dir>] [--slug-prefix <prefix>] [--force]',
+    'Write Payload collections for the import: posts, pages, categories, tags, authors, media, and the custom post types and taxonomies of an export.',
+  usage: 'scaffold [export.xml] [--out <dir>] [--slug-prefix <prefix>] [--force]',
   help: [
+    [
+      'export.xml',
+      'Also write collections for the custom post types and taxonomies of this export',
+    ],
     ['--out <dir>', 'Where to write the collection files (default: src/collections/wp)'],
     [
       '--slug-prefix <prefix>',
@@ -79,6 +161,10 @@ export const scaffoldCommand: Command = {
         key === 'redirects' ? slug : `${prefix}${slug}`,
       ]),
     ) as unknown as CollectionSlugs
+    const exportFile = ctx.positionals[0] ? resolve(ctx.cwd, ctx.positionals[0]) : undefined
+    if (exportFile && !existsSync(exportFile)) throw new UsageError(`${exportFile} does not exist`)
+    const survey = exportFile ? surveyIndex(await buildSiteIndex(exportFile)) : EMPTY_SURVEY
+    const custom = customCollections(resolveSiteTypes(config, survey), slugs, prefix)
     const hasSrc = existsSync(join(ctx.cwd, 'src'))
     const outDir = resolve(
       ctx.cwd,
@@ -92,6 +178,8 @@ export const scaffoldCommand: Command = {
       slugs.tags,
       slugs.authors,
       slugs.media,
+      ...custom.taxonomies.map((t) => t.slug),
+      ...custom.postTypes.map((t) => t.slug),
     ]
     const clashes = await findExistingSlugs(hasSrc ? join(ctx.cwd, 'src') : ctx.cwd, outDir, wanted)
     if (clashes.size > 0) {
@@ -112,7 +200,7 @@ export const scaffoldCommand: Command = {
     await mkdir(outDir, { recursive: true })
     const written: string[] = []
     const kept: string[] = []
-    for (const file of scaffoldFiles(slugs)) {
+    for (const file of scaffoldFiles(slugs, custom)) {
       const path = join(outDir, file.name)
       if (existsSync(path) && !ctx.values.force) {
         kept.push(path)
@@ -123,15 +211,25 @@ export const scaffoldCommand: Command = {
     }
     for (const path of written) success(`wrote ${relative(ctx.cwd, path)}`)
     for (const path of kept) info(`kept ${relative(ctx.cwd, path)} (exists; --force overwrites)`)
+    const listed = [...custom.postTypes, ...custom.taxonomies]
+    if (listed.length > 0) {
+      out()
+      out('Collections for the custom post types and taxonomies of the export:')
+      for (const c of listed) out(`  ${c.wpName} → ${c.slug}`)
+      out('Delete the files of the ones you do not need, and their lines in index.ts.')
+    } else if (!exportFile) {
+      info(
+        'Give the export file (scaffold export.xml) to get collections for its custom types too.',
+      )
+    }
 
     if (prefix) {
       const configPath = join(ctx.cwd, CONFIG_FILE)
-      const collections: Partial<CollectionSlugs> = { ...slugs }
-      delete collections.redirects
+      const settings = prefixedSettings(slugs, custom, config)
       if (existsSync(configPath)) {
-        warn(`Add the new slugs to ${CONFIG_FILE}: "collections": ${JSON.stringify(collections)}`)
+        warn(`Add the new slugs to ${CONFIG_FILE}: ${JSON.stringify(settings)}`)
       } else {
-        await writeFile(configPath, `${JSON.stringify({ collections }, null, 2)}\n`)
+        await writeFile(configPath, `${JSON.stringify(settings, null, 2)}\n`)
         success(`wrote ${CONFIG_FILE} with the prefixed collection slugs`)
       }
     }
@@ -147,7 +245,7 @@ export const scaffoldCommand: Command = {
       `Add the collections and plugins to ${configFile ? relative(ctx.cwd, configFile) : 'payload.config.ts'}:`,
     )
     out()
-    out(paint('cyan', configSnippet(slugs, importPathFrom(configFile, outDir))))
+    out(paint('cyan', configSnippet(slugs, importPathFrom(configFile, outDir), custom)))
     out()
     const missing = ['@payloadcms/plugin-seo', '@payloadcms/plugin-redirects'].filter(
       (p) => !findPackageDir(p, ctx.cwd),

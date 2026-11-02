@@ -5,7 +5,8 @@ useful contribution of all; please make up the content (see [Test data](#test-da
 
 ## Setup
 
-You need Node.js 22.12 or newer (24 for the integration tests is fine too).
+You need Node.js 22.22.2+, 24.15+ or 26+, the versions jsdom supports. The integration tests
+need what Payload 3.92 needs: 22.23.4+ or 24.22.1+.
 
 ```bash
 npm ci
@@ -26,8 +27,9 @@ npm run test:integration   # temporary Payload projects on SQLite; needs the bui
 npm run test:external      # WordPress Theme Unit Test data, downloaded at run time
 ```
 
-Run lint, typecheck and the unit tests before every push; CI runs all of them and the
-integration tests on Node 22 and 24. `npm run format` fixes formatting.
+Run lint, typecheck and the unit tests before every push. CI runs the unit tests on the
+lowest supported versions (22.22.2 and 24.15.0) and the latest Node 22, 24 and 26, and the
+integration tests on the latest Node 22 and 24. `npm run format` fixes formatting.
 
 ## Project layout
 
@@ -43,6 +45,7 @@ src/
   import/     the import: runner (inside `payload run`), schema checks, media, Lexical
   commands/   one file per CLI command
   util/       entities, slugs, MIME types, PHP serialize() reader
+  site-types.ts  which post types and taxonomies are imported, into which collections
 scripts/
   fixtures/   builds WordPress sites in Docker and exports them as fixtures
 test/
@@ -107,7 +110,7 @@ require __DIR__ . '/../lib/fixtures.php';
 
 The helpers in `scripts/fixtures/lib/fixtures.php` create posts, terms, users, images and menu
 items with fixed dates. `scripts/fixtures/mu-plugins/` holds our own small plugins for the
-test sites, such as the custom post type of the `core` scenario.
+test sites, such as the custom post types of the `core` scenario.
 
 - Content is synthetic, like all fixtures: made-up names and texts, `example.com` addresses.
   The admin password is random, and exports contain no user passwords.

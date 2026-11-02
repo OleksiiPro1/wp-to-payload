@@ -26,9 +26,12 @@ export const importCommand: Command = {
     ['--uploads-dir <dir>', 'Local copy of wp-content/uploads; files there are not downloaded'],
     ['--offline', 'Never download media; use only --uploads-dir'],
     ['--dry-run', 'Check everything and report what would change, without writing'],
-    ['--only <list>', `Run only these steps: ${PHASES.join(', ')}`],
+    [
+      '--only <list>',
+      `Run only these steps: ${PHASES.join(', ')}, or the collection of a custom post type or taxonomy`,
+    ],
     ['--write-redirects', 'Also write redirects into the @payloadcms/plugin-redirects collection'],
-    ['--limit <n>', 'Import at most n posts and n pages (for a first test)'],
+    ['--limit <n>', 'Import at most n items of each post type (for a first test)'],
     ['--concurrency <n>', 'Parallel media downloads (default: 4)'],
     ['--refresh-media', 'Upload media files again even if they were imported before'],
     ['--media-host <host>', 'Another host media may be downloaded from (CDN); repeatable'],
@@ -56,10 +59,11 @@ export const importCommand: Command = {
   async run(ctx) {
     const file = resolve(ctx.cwd, requireExportFile(ctx))
     if (!existsSync(file)) throw new UsageError(`${file} does not exist`)
+    // Steps of custom types depend on the export; the import checks them against it.
     const only = listOption(ctx, 'only')
     for (const phase of only) {
-      if (!(PHASES as readonly string[]).includes(phase)) {
-        throw new UsageError(`unknown step "${phase}" for --only (known: ${PHASES.join(', ')})`)
+      if (!/^[a-z0-9][a-z0-9_-]*$/.test(phase)) {
+        throw new UsageError(`"${phase}" is not a step for --only (known: ${PHASES.join(', ')})`)
       }
     }
     const uploadsDir = stringOption(ctx, 'uploads-dir')

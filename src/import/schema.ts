@@ -43,6 +43,12 @@ export class CollectionSchema {
     return Array.isArray(to) ? to.includes(collection) : to === collection
   }
 
+  /** The first relationship or upload field that can point to `collection`. */
+  fieldRelatingTo(collection: string): string | undefined {
+    for (const name of this.fields.keys()) if (this.relatesTo(name, collection)) return name
+    return undefined
+  }
+
   /** A relationship value in the shape the field expects (single, array, or polymorphic). */
   relationValue(name: string, collection: string, ids: (string | number)[]): unknown {
     const field = this.fields.get(name)

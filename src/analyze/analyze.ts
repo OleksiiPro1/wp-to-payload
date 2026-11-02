@@ -3,6 +3,13 @@ import { basename } from 'node:path'
 import { BUILDERS, type Builder, detectBuilders } from '../content/builders.js'
 import { BLOCK_OPENER, blockSupport, hasBlocks, normalizeBlockName } from '../content/blocks.js'
 import { scanShortcodes } from '../content/shortcodes-scan.js'
+import { DEFAULT_CONFIG } from '../config.js'
+import {
+  BUILTIN_POST_TYPES,
+  BUILTIN_TAXONOMIES,
+  resolveSiteTypes,
+  TypeSurveyor,
+} from '../site-types.js'
 import { mimeTypeOf } from '../util/mime.js'
 import { VERSION } from '../version.js'
 import type { WxrItem, WxrParseIssue, WxrSite, WxrTerm } from '../wxr/model.js'
@@ -10,7 +17,15 @@ import { metaValue } from '../wxr/model.js'
 import { readWxr } from '../wxr/reader.js'
 import { INTERNAL_TYPES, siteUrlOf } from '../wxr/site-index.js'
 import { scoreComplexity } from './complexity.js'
-import type { AnalyzeReport, BlockUsage, Detection, NamedCount, StatusCounts } from './report.js'
+import type {
+  AnalyzeReport,
+  BlockUsage,
+  CustomPostType,
+  CustomTaxonomy,
+  Detection,
+  NamedCount,
+  StatusCounts,
+} from './report.js'
 
 const SEO_KEYS = ['yoast', 'rankmath', 'aioseo', 'seopress'] as const
 
@@ -93,7 +108,7 @@ export const analyzeExport = async (file: string): Promise<AnalyzeReport> => {
   let attachments = 0
   let comments = 0
   let menuItems = 0
-  const customPostTypes: Record<string, number> = {}
+  const surveyor = new TypeSurveyor()
   const mediaTypes: Record<string, number> = {}
   const mediaHosts = new Set<string>()
   const blocks = new Map<string, Usage>()
@@ -155,11 +170,13 @@ export const analyzeExport = async (file: string): Promise<AnalyzeReport> => {
       if (!termKeys.has(key)) {
         termKeys.add(key)
         terms.push(record.term)
+        surveyor.addTerm(record.term)
       }
       continue
     }
 
     const { item } = record
+    surveyor.addItem(item)
     comments += item.commentCount
 
     if (item.type === 'attachment') {
@@ -193,8 +210,6 @@ export const analyzeExport = async (file: string): Promise<AnalyzeReport> => {
     } else if (item.type === 'page') {
       pages.total++
       bump(pages.byStatus, item.status || 'unknown')
-    } else if (!WOO_TYPES.has(item.type)) {
-      bump(customPostTypes, item.type)
     }
 
     // Trashed and auto-saved items are counted by status but never migrated, so their content
@@ -249,6 +264,44 @@ export const analyzeExport = async (file: string): Promise<AnalyzeReport> => {
       bump(otherTerms, term.taxonomy)
   }
 
+  // What the import does with each custom type, with the default settings.
+  const survey = surveyor.result()
+  const types = resolveSiteTypes(DEFAULT_CONFIG, survey)
+  const reasonOf = (kind: 'post type' | 'taxonomy', name: string) =>
+    types.skipped.find((s) => s.kind === kind && s.name === name)?.reason
+  const customPostTypes: Record<string, number> = {}
+  const customTypeList: CustomPostType[] = []
+  for (const t of survey.postTypes.values()) {
+    if (BUILTIN_POST_TYPES.has(t.name)) continue
+    const target = types.postTypes.find((x) => x.wpType === t.name)
+    if (target) customPostTypes[t.name] = t.items
+    const reason = reasonOf('post type', t.name)
+    customTypeList.push({
+      name: t.name,
+      items: t.items,
+      byStatus: t.byStatus,
+      hierarchical: target?.hierarchical ?? t.hasParents,
+      taxonomies: t.taxonomies,
+      imported: target !== undefined,
+      ...(reason ? { reason } : {}),
+    })
+  }
+  const customTaxonomyList: CustomTaxonomy[] = []
+  for (const t of survey.taxonomies.values()) {
+    // Menus have their own count.
+    if (BUILTIN_TAXONOMIES.has(t.name) || t.name === 'nav_menu') continue
+    const target = types.taxonomies.find((x) => x.taxonomy === t.name)
+    const reason = reasonOf('taxonomy', t.name)
+    customTaxonomyList.push({
+      name: t.name,
+      terms: t.terms,
+      hierarchical: target?.hierarchical ?? t.hasParents,
+      postTypes: t.postTypes,
+      imported: target !== undefined,
+      ...(reason ? { reason } : {}),
+    })
+  }
+
   const toList = (map: Map<string, Usage>): NamedCount[] =>
     [...map].map(([name, u]) => ({ name, count: u.count, items: u.items })).sort(byCount)
 
@@ -296,6 +349,7 @@ export const analyzeExport = async (file: string): Promise<AnalyzeReport> => {
       menuItems,
       customPostTypes,
     },
+    customTypes: { postTypes: customTypeList, taxonomies: customTaxonomyList },
     content: {
       gutenbergItems,
       classicItems,

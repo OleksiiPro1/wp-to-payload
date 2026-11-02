@@ -22,7 +22,13 @@ export const createRun = (name: string): string => {
   return dir
 }
 
-export const writePayloadConfig = (dir: string, body = ''): void => {
+/** A Payload config with the scaffolded collections; `documents` get SEO fields and redirects. */
+export const writePayloadConfig = (
+  dir: string,
+  body = '',
+  documents: string[] = ['posts', 'pages'],
+): void => {
+  const list = JSON.stringify(documents).replaceAll('"', "'")
   writeFileSync(
     join(dir, 'src', 'payload.config.ts'),
     `import { sqliteAdapter } from '@payloadcms/db-sqlite'
@@ -40,8 +46,8 @@ export default buildConfig({
   db: sqliteAdapter({ client: { url: \`file:\${path.resolve(dirname, '../db.sqlite')}\` } }),
   collections: wpCollections,
   plugins: [
-    seoPlugin({ collections: ['posts', 'pages'], uploadsCollection: 'media' }),
-    redirectsPlugin({ collections: ['posts', 'pages'] }),
+    seoPlugin({ collections: ${list}, uploadsCollection: 'media' }),
+    redirectsPlugin({ collections: ${list} }),
   ],
   ${body}
 })

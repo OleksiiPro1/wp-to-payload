@@ -26,7 +26,7 @@ interface ImportReport {
   dryRun: boolean
   phases: Record<string, { created: number; updated: number; skipped: number; failed: number }>
   errors: unknown[]
-  warnings: { code: string; wpId?: number }[]
+  warnings: { code: string; message: string; wpId?: number }[]
 }
 
 const COLLECTIONS = ['media', 'categories', 'tags', 'authors', 'posts', 'pages', 'redirects']
@@ -110,10 +110,12 @@ describe.skipIf(!installed)('import into a Payload 3 project with SQLite', () =>
       authors: { created: 2 },
       posts: { created: 3 },
       pages: { created: 3 },
-      redirects: { created: 4 },
+      // The recipe has no collection, but its old URL is redirected all the same.
+      redirects: { created: 5 },
     })
     expect(r.warnings.map((w) => w.code).sort()).toEqual([
       'BLOCK_REMOVED',
+      'COLLECTION_MISSING',
       'SEO_CANONICAL',
       'SEO_VARIABLE',
       'SHORTCODE_REMOVED',
@@ -166,7 +168,7 @@ describe.skipIf(!installed)('import into a Payload 3 project with SQLite', () =>
       authors: 2,
       posts: 3,
       pages: 3,
-      redirects: 4,
+      redirects: 5,
     })
     const { ids, post } = data
     const media = ids.media as Record<number, number>
@@ -217,7 +219,11 @@ describe.skipIf(!installed)('import into a Payload 3 project with SQLite', () =>
       `/2024/01/15/hello-sourdough/ reference:${ids.posts?.[10]}`,
       `/2024/01/15/hello-world/ reference:${ids.posts?.[10]}`,
       `/2024/02/01/bakery-news/ reference:${ids.posts?.[11]}`,
+      '/recipe/rye-bread/ custom:/recipes/rye-bread',
     ])
+    expect(r.warnings.find((w) => w.code === 'COLLECTION_MISSING')?.message).toBe(
+      'There is no collection "recipes"; 1 item of type recipe was not imported.',
+    )
   })
 
   it('updates instead of duplicating when run again', () => {
@@ -227,7 +233,7 @@ describe.skipIf(!installed)('import into a Payload 3 project with SQLite', () =>
       media: { created: 0, updated: 3 },
       posts: { created: 0, updated: 3 },
       pages: { created: 0, updated: 3 },
-      redirects: { created: 0, updated: 4 },
+      redirects: { created: 0, updated: 5 },
     })
     const counts = queryPayload<Record<string, number>>(dir, countAll)
     expect(counts).toEqual({
@@ -237,7 +243,7 @@ describe.skipIf(!installed)('import into a Payload 3 project with SQLite', () =>
       authors: 2,
       posts: 3,
       pages: 3,
-      redirects: 4,
+      redirects: 5,
     })
   })
 })

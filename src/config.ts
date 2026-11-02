@@ -31,6 +31,30 @@ export interface FieldNames {
   wpId: string
 }
 
+/** Settings for a custom post type. Everything is optional; the defaults come from the export. */
+export interface PostTypeSettings {
+  /** Payload collection slug. Default: the type in plural, `recipe` → `recipes`. */
+  collection?: string
+  /** New URL pattern, the same as `paths.<type>`. Default: `/recipes/:slug`. */
+  path?: string
+  /** Whether items have parents, like pages. Default: whether the export has such items. */
+  hierarchical?: boolean
+}
+
+/** Settings for a custom taxonomy. */
+export interface TaxonomySettings {
+  /** Payload collection slug. Default: the taxonomy in plural, `recipe_category` → `recipe-categories`. */
+  collection?: string
+  /** New URL pattern of the term archives (`:slug`, `:path`). Default: none, no redirects. */
+  path?: string
+  /** Path of the archives on the old site before the term (`rezeptkategorie` in `/rezeptkategorie/brot/`). Default: the taxonomy name. */
+  base?: string
+  /** Relationship field of the documents for these terms. Default: `recipeCategories`. */
+  field?: string
+  /** Whether terms have parents. Default: whether the export has such terms. */
+  hierarchical?: boolean
+}
+
 export interface Config {
   /** New URL path per WordPress type (`post`, `page`, `category`, `tag`, custom types). */
   paths: PathPatterns
@@ -38,6 +62,10 @@ export interface Config {
   siteHosts: string[]
   collections: CollectionSlugs
   fields: FieldNames
+  /** Custom post types, by WordPress name. */
+  postTypes: Record<string, PostTypeSettings>
+  /** Custom taxonomies, by WordPress name. */
+  taxonomies: Record<string, TaxonomySettings>
   seo: { separator: string }
   media: {
     /** Hosts media may be downloaded from besides the site itself (for example a CDN). */
@@ -73,6 +101,8 @@ export const DEFAULT_CONFIG: Config = {
     meta: 'meta',
     wpId: 'wpId',
   },
+  postTypes: {},
+  taxonomies: {},
   seo: { separator: '-' },
   media: { hosts: [] },
   importAuthorEmails: false,
@@ -109,10 +139,62 @@ const KNOWN_KEYS = new Set([
   'siteHosts',
   'collections',
   'fields',
+  'postTypes',
+  'taxonomies',
   'seo',
   'media',
   'importAuthorEmails',
 ])
+
+type SettingType = 'string' | 'pattern' | 'boolean'
+
+/** Validates `postTypes` or `taxonomies`: WordPress names mapped to objects of known settings. */
+const typeSettings = <T>(
+  value: unknown,
+  where: string,
+  known: Record<string, SettingType>,
+  builtin: Record<string, string>,
+): Record<string, T> => {
+  if (value === undefined) return {}
+  if (!isObject(value)) throw new ConfigError(`${where} must be an object`)
+  for (const [name, settings] of Object.entries(value)) {
+    if (!/^[a-z0-9_-]+$/.test(name)) {
+      throw new ConfigError(`${where}: "${name}" is not a WordPress name (a-z, 0-9, _ and -)`)
+    }
+    const hint = builtin[name]
+    if (hint) throw new ConfigError(`${where}.${name}: ${hint}`)
+    if (!isObject(settings)) throw new ConfigError(`${where}.${name} must be an object`)
+    for (const [key, v] of Object.entries(settings)) {
+      const type = known[key]
+      if (!type) {
+        throw new ConfigError(
+          `${where}.${name}: unknown setting "${key}" (known: ${Object.keys(known).join(', ')})`,
+        )
+      }
+      if (type === 'boolean' ? typeof v !== 'boolean' : typeof v !== 'string' || v === '') {
+        throw new ConfigError(
+          `${where}.${name}.${key} must be ${type === 'boolean' ? 'true or false' : 'a non-empty string'}`,
+        )
+      }
+      const problem = type === 'pattern' ? validatePattern(v as string) : undefined
+      if (problem) throw new ConfigError(`${where}.${name}.${key}: ${problem}`)
+    }
+  }
+  return structuredClone(value) as Record<string, T>
+}
+
+const BUILTIN_TYPE_HINTS: Record<string, string> = {
+  post: 'posts are set with collections.posts and paths.post',
+  page: 'pages are set with collections.pages and paths.page',
+  attachment: 'media are set with collections.media',
+  nav_menu_item: 'menu items are not a content type',
+  revision: 'revisions are never imported',
+}
+
+const BUILTIN_TAXONOMY_HINTS: Record<string, string> = {
+  category: 'categories are set with collections.categories, fields.categories and paths.category',
+  post_tag: 'tags are set with collections.tags, fields.tags and paths.tag',
+}
 
 /** Validates a parsed config file and merges it with the defaults. */
 export const parseConfig = (raw: unknown, source = CONFIG_FILE): Config => {
@@ -124,6 +206,36 @@ export const parseConfig = (raw: unknown, source = CONFIG_FILE): Config => {
   for (const pattern of Object.values(paths)) {
     const problem = validatePattern(pattern)
     if (problem) throw new ConfigError(`${source}: paths: ${problem}`)
+  }
+  const postTypes = typeSettings<PostTypeSettings>(
+    raw.postTypes,
+    `${source}: postTypes`,
+    { collection: 'string', path: 'pattern', hierarchical: 'boolean' },
+    BUILTIN_TYPE_HINTS,
+  )
+  const taxonomies = typeSettings<TaxonomySettings>(
+    raw.taxonomies,
+    `${source}: taxonomies`,
+    {
+      collection: 'string',
+      path: 'pattern',
+      base: 'string',
+      field: 'string',
+      hierarchical: 'boolean',
+    },
+    BUILTIN_TAXONOMY_HINTS,
+  )
+  // A post type's path can be set in either place; paths is what the rest of the tool reads.
+  const explicitPaths = isObject(raw.paths) ? raw.paths : {}
+  for (const [type, settings] of Object.entries(postTypes)) {
+    if (settings.path === undefined) continue
+    const other = explicitPaths[type]
+    if (other !== undefined && other !== settings.path) {
+      throw new ConfigError(
+        `${source}: postTypes.${type}.path and paths.${type} differ; set the path in one place`,
+      )
+    }
+    paths[type] = settings.path
   }
   const collections = stringRecord(raw.collections, 'collections')
   for (const key of Object.keys(collections)) {
@@ -149,6 +261,8 @@ export const parseConfig = (raw: unknown, source = CONFIG_FILE): Config => {
     siteHosts: stringList(raw.siteHosts, 'siteHosts'),
     collections: { ...DEFAULT_CONFIG.collections, ...collections },
     fields: { ...DEFAULT_CONFIG.fields, ...fields },
+    postTypes,
+    taxonomies,
     seo: {
       separator: typeof seo.separator === 'string' ? seo.separator : DEFAULT_CONFIG.seo.separator,
     },

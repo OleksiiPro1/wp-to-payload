@@ -7,12 +7,23 @@ import { SiteUrls } from '../paths/site-urls.js'
 import { buildRedirects } from '../redirects/build.js'
 import { type Warning, WarningCollector } from '../report/warnings.js'
 import { extractSeo } from '../seo/seo.js'
+import {
+  type PostTypeTarget,
+  resolveSiteTypes,
+  siteUrlsOptions,
+  surveyIndex,
+  type TaxonomyTarget,
+} from '../site-types.js'
 import { decodeEntities } from '../util/entities.js'
 import { slugify } from '../util/slug.js'
 import { metaValue, type WxrItem, type WxrTerm } from '../wxr/model.js'
 import { readWxr } from '../wxr/reader.js'
-import { buildSiteIndex, type IndexedAttachment, type SiteIndex } from '../wxr/site-index.js'
-import { type DocumentType, documentTypes } from './document-types.js'
+import {
+  buildSiteIndex,
+  type IndexedAttachment,
+  type IndexedPost,
+  type SiteIndex,
+} from '../wxr/site-index.js'
 import { htmlToLexical, isEmptyState } from './lexical.js'
 import { type Phase, phaseLabel, PHASES } from './phases.js'
 import { MediaSource } from './media.js'
@@ -34,7 +45,10 @@ export interface ImportOptions {
   /** Use only `uploadsDir`; never download media. */
   offline: boolean
   dryRun: boolean
-  /** Phases to run. Redirects run only when listed here or with `writeRedirects`. */
+  /**
+   * Phases to run: built-in steps or the steps of custom types, named after their collections.
+   * Redirects run only when listed here or with `writeRedirects`.
+   */
   only: Phase[]
   writeRedirects: boolean
   /** Write at most this many documents of each post type. */
@@ -128,23 +142,6 @@ export const importExport = async (
   const { config, log } = options
   const f = config.fields
   const slugs = config.collections
-  const types = documentTypes(config)
-  // Every step and the collection it writes to, in the order the steps run.
-  const phaseCollection = new Map<Phase, string>([
-    ['media', slugs.media],
-    ['categories', slugs.categories],
-    ['tags', slugs.tags],
-    ['authors', slugs.authors],
-    ...types.map((t): [Phase, string] => [t.phase, t.collection]),
-    ['redirects', slugs.redirects],
-  ])
-  const result: ImportResult = {
-    dryRun: options.dryRun,
-    phases: Object.fromEntries([...phaseCollection.keys()].map((p) => [p, emptyPhase()])),
-    errors: [],
-    warnings: [],
-    durationMs: 0,
-  }
   const warnings = new WarningCollector()
   const missingReported = new Set<string>()
   const reportMissing = (collection: string, fields: string[]) => {
@@ -168,7 +165,29 @@ export const importExport = async (
       `${index.issues.length} XML errors in the export were skipped; run analyze for details.`,
     )
   }
-  const urls = new SiteUrls(index, { patterns: config.paths, extraHosts: config.siteHosts })
+  const types = resolveSiteTypes(config, surveyIndex(index))
+  // Every step and the collection it writes to, in the order the steps run.
+  const phaseCollection = new Map<Phase, string>([
+    ['media', slugs.media],
+    ...types.taxonomies.map((t): [Phase, string] => [t.phase, t.collection]),
+    ['authors', slugs.authors],
+    ...types.postTypes.map((t): [Phase, string] => [t.phase, t.collection]),
+    ['redirects', slugs.redirects],
+  ])
+  const unknownPhases = options.only.filter((p) => !phaseCollection.has(p))
+  if (unknownPhases.length > 0) {
+    throw new ImportSetupError(
+      `unknown step ${unknownPhases.map((p) => `"${p}"`).join(', ')} for --only (the steps for this export: ${[...phaseCollection.keys()].join(', ')})`,
+    )
+  }
+  const result: ImportResult = {
+    dryRun: options.dryRun,
+    phases: Object.fromEntries([...phaseCollection.keys()].map((p) => [p, emptyPhase()])),
+    errors: [],
+    warnings: [],
+    durationMs: 0,
+  }
+  const urls = new SiteUrls(index, siteUrlsOptions(config, types))
   const matcher = new MediaMatcher(index.attachments)
   const attachmentsByParent = new Map<number, IndexedAttachment[]>()
   for (const a of index.attachments.values()) {
@@ -193,6 +212,45 @@ export const importExport = async (
     return schema
   }
 
+  /** What a step would import, for the warning when its collection is missing. */
+  const contentOf = (phase: Phase): { count: number; noun: string } | undefined => {
+    const plural = (n: number, one: string, many: string) => (n === 1 ? one : many)
+    if (phase === 'media') {
+      const n = index.attachments.size
+      return { count: n, noun: plural(n, 'media file', 'media files') }
+    }
+    if (phase === 'authors') {
+      const n = index.authors.size
+      return { count: n, noun: plural(n, 'author', 'authors') }
+    }
+    const taxonomy = types.taxonomies.find((t) => t.phase === phase)
+    if (taxonomy) {
+      const n = index.terms.filter((t) => t.taxonomy === taxonomy.taxonomy).length
+      return { count: n, noun: `${plural(n, 'term', 'terms')} of ${taxonomy.taxonomy}` }
+    }
+    const type = types.postTypes.find((t) => t.phase === phase)
+    if (!type) return undefined
+    let n = 0
+    for (const post of index.posts.values()) {
+      if (post.type === type.wpType && IMPORTED_STATUSES.has(post.status)) n++
+    }
+    return { count: n, noun: `${plural(n, 'item', 'items')} of type ${type.wpType}` }
+  }
+
+  // Items of plugin types are not content; say so once per type when documents are imported.
+  if (types.postTypes.some((t) => selected.has(t.phase))) {
+    for (const s of types.skipped) {
+      if (s.kind !== 'post type' || s.count === 0) continue
+      warnings
+        .for({ wpType: s.name })
+        .add(
+          'TYPE_SKIPPED',
+          `${s.count} ${s.count === 1 ? 'item' : 'items'} of type ${s.name} (${s.reason}) ${s.count === 1 ? 'was' : 'were'} not imported.`,
+          s.name,
+        )
+    }
+  }
+
   const problems: string[] = []
   for (const [phase, slug] of phaseCollection) {
     if (!selected.has(phase)) continue
@@ -200,6 +258,20 @@ export const importExport = async (
     if (!schema) {
       selected.delete(phase)
       log(`Skipping ${phase}: there is no collection "${slug}"`)
+      const content = contentOf(phase)
+      if (content && content.count > 0) {
+        warnings.add(
+          'COLLECTION_MISSING',
+          `There is no collection "${slug}"; ${content.count} ${content.noun} ${content.count === 1 ? 'was' : 'were'} not imported.`,
+          slug,
+        )
+      } else if (phase === 'redirects') {
+        warnings.add(
+          'COLLECTION_MISSING',
+          `There is no collection "${slug}"; no redirects were written (add @payloadcms/plugin-redirects).`,
+          slug,
+        )
+      }
       continue
     }
     if (phase === 'redirects') {
@@ -425,8 +497,7 @@ export const importExport = async (
   // Terms ------------------------------------------------------------------------------------
   const termIds = new Map<string, DocId>()
   const termKey = (taxonomy: string, slug: string) => `${taxonomy}:${slug}`
-  const importTerms = async (phase: 'categories' | 'tags', taxonomy: 'category' | 'post_tag') => {
-    const slug = phaseCollection.get(phase) as string
+  const importTerms = async ({ phase, taxonomy, collection: slug }: TaxonomyTarget) => {
     const schema = schemaOf(slug)
     if (!schema?.has(f.wpId)) return
     const terms = index.terms.filter((t) => t.taxonomy === taxonomy)
@@ -447,7 +518,7 @@ export const importExport = async (
     }
     log(`${phaseLabel(phase)}: ${terms.length}`)
     let done = 0
-    for (const term of taxonomy === 'category' ? sortByParent(terms) : terms) {
+    for (const term of sortByParent(terms)) {
       done++
       const key = keyOf(term)
       const parentId = term.parentSlug ? termIds.get(termKey(taxonomy, term.parentSlug)) : undefined
@@ -465,8 +536,7 @@ export const importExport = async (
       progress(phase, done, terms.length)
     }
   }
-  await importTerms('categories', 'category')
-  await importTerms('tags', 'post_tag')
+  for (const taxonomy of types.taxonomies) await importTerms(taxonomy)
 
   // Authors ----------------------------------------------------------------------------------
   const authorIds = new Map<string, DocId>()
@@ -496,7 +566,7 @@ export const importExport = async (
   }
 
   // Posts, pages and other post types -------------------------------------------------------
-  const typeOf = new Map(types.map((t) => [t.wpType, t]))
+  const typeOf = new Map(types.postTypes.map((t) => [t.wpType, t]))
   const docIds = new Map<number, { collection: string; id: DocId }>()
   /** Status written for each hierarchical document, kept when its parent is set afterwards. */
   const statusOf = new Map<number, string>()
@@ -511,18 +581,18 @@ export const importExport = async (
     return entry
   }
 
-  // Duplicate slugs within a non-hierarchical type (possible for drafts) get the WordPress ID
-  // appended.
+  // Duplicate slugs within a collection of a non-hierarchical type (possible for drafts) get
+  // the WordPress ID appended.
   const uniqueSlugs = new Map<number, string>()
   {
-    const seen = new Map<string, number>()
+    const seen = new Map<string, IndexedPost>()
     for (const post of index.posts.values()) {
       const type = typeOf.get(post.type)
       if (!type || type.hierarchical || !IMPORTED_STATUSES.has(post.status)) continue
-      const key = `${post.type}:${post.slug}`
+      const key = `${type.collection}:${post.slug}`
       const other = seen.get(key)
       if (other === undefined) {
-        seen.set(key, post.id)
+        seen.set(key, post)
         continue
       }
       uniqueSlugs.set(post.id, `${post.slug}-${post.id}`)
@@ -530,7 +600,7 @@ export const importExport = async (
         .for({ wpId: post.id, wpType: post.type })
         .add(
           'SLUG_CHANGED',
-          `Slug "${post.slug}" is also used by ${post.type} ${other}; this ${post.type} got "${post.slug}-${post.id}".`,
+          `Slug "${post.slug}" is also used by ${other.type} ${other.id}; this ${post.type} got "${post.slug}-${post.id}".`,
           post.slug,
         )
     }
@@ -594,13 +664,18 @@ export const importExport = async (
     if (authorId !== undefined && schema.relatesTo(f.author, slugs.authors)) {
       data[f.author] = schema.relationValue(f.author, slugs.authors, [authorId])
     }
-    const categories = termIdsOf(item, 'category')
-    if (categories.length > 0 && schema.relatesTo(f.categories, slugs.categories)) {
-      data[f.categories] = schema.relationValue(f.categories, slugs.categories, categories)
-    }
-    const tags = termIdsOf(item, 'post_tag')
-    if (tags.length > 0 && schema.relatesTo(f.tags, slugs.tags)) {
-      data[f.tags] = schema.relationValue(f.tags, slugs.tags, tags)
+    for (const taxonomy of types.taxonomies) {
+      const ids = termIdsOf(item, taxonomy.taxonomy)
+      if (ids.length === 0) continue
+      // Collections designed by hand may name the field differently; any relationship to the
+      // taxonomy's collection will do for custom taxonomies.
+      const field = schema.relatesTo(taxonomy.field, taxonomy.collection)
+        ? taxonomy.field
+        : taxonomy.builtin
+          ? undefined
+          : schema.fieldRelatingTo(taxonomy.collection)
+      if (field) data[field] = schema.relationValue(field, taxonomy.collection, ids)
+      else reportMissing(schema.slug, [taxonomy.field])
     }
     const thumbnail = Number(metaValue(item, '_thumbnail_id'))
     const featuredId = Number.isFinite(thumbnail) ? mediaIds.get(thumbnail) : undefined
@@ -637,8 +712,8 @@ export const importExport = async (
     return { data, draft: !published }
   }
 
-  const selectedTypes = types.filter((t) => selected.has(t.phase))
-  for (const type of types) {
+  const selectedTypes = types.postTypes.filter((t) => selected.has(t.phase))
+  for (const type of types.postTypes) {
     if (selected.has(type.phase)) continue
     const schema = schemaOf(type.collection)
     if (!schema?.has(f.wpId)) continue
@@ -652,7 +727,7 @@ export const importExport = async (
       if (!IMPORTED_STATUSES.has(post.status) || !typeOf.has(post.type)) continue
       totals.set(post.type, (totals.get(post.type) ?? 0) + 1)
     }
-    const totalOf = (type: DocumentType) => {
+    const totalOf = (type: PostTypeTarget) => {
       const total = totals.get(type.wpType) ?? 0
       return options.limit === undefined ? total : Math.min(total, options.limit)
     }
@@ -696,12 +771,15 @@ export const importExport = async (
         const schema = schemaOf(type.collection) as CollectionSchema
         if (!schema.relatesTo(f.parent, type.collection)) continue
         const parent = docIds.get(post.parentId)
-        if (!parent) {
+        if (!parent || parent.collection !== type.collection) {
+          const parentType = index.posts.get(post.parentId)?.type ?? 'item'
           warnings
             .for({ wpId, wpType: post.type })
             .add(
               'REFERENCE_MISSING',
-              `Parent ${post.type} ${post.parentId} was not imported; the ${post.type} has no parent.`,
+              parent
+                ? `Parent ${parentType} ${post.parentId} is in collection "${parent.collection}", not "${type.collection}"; the ${post.type} has no parent.`
+                : `Parent ${parentType} ${post.parentId} was not imported; the ${post.type} has no parent.`,
               String(post.parentId),
             )
           continue

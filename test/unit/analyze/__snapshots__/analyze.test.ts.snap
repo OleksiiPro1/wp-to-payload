@@ -39,10 +39,14 @@ Score: 0–2 simple, 3–5 medium, 6 or more complex. Page builders, WooCommerce
 | Categories | 1 |  |
 | Tags | 0 |  |
 | Authors | 1 |  |
-| Comments | 0 | not migrated in 0.1 |
-| Menu items | 0 | not migrated in 0.1 |
+| Comments | 0 | not migrated |
+| Menu items | 0 | not migrated |
 
 Editor: 1 items use blocks (Gutenberg), 5 use the classic editor, 0 are empty.
+
+## Custom post types and taxonomies
+
+None: only posts, pages, categories and tags.
 
 ## Gutenberg blocks
 
@@ -73,7 +77,7 @@ On import, \`[caption]\` and \`[gallery]\` are converted. Other shortcodes are r
 
 ## Plugins and features
 
-| Feature | Found | Items | In version 0.1 |
+| Feature | Found | Items | Import |
 | --- | --- | --- | --- |
 | Elementor | yes | 1 | text kept, layout lost |
 | Divi | yes | 1 | text kept, layout lost |

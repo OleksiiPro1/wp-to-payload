@@ -31,6 +31,18 @@ interface Imported {
   pending: { slug: string; status: string }
   secret: string
   bread?: string
+  rye: {
+    slug: string
+    status: string
+    author?: string
+    excerpt?: string
+    featured?: string
+    categories: string[]
+  }
+  rollsLinks: string[]
+  rye_flour: { parent?: string; links: string[] }
+  sourdoughBread?: string
+  redirects: string[]
 }
 
 interface Report {
@@ -68,8 +80,18 @@ describe.skipIf(!projectInstalled())('import of a real WordPress export', () => 
       mkdirSync(dirname(file), { recursive: true })
       writeFileSync(file, solidPng(8, 5, [attachment.id * 40, 100, 50]))
     }
-    expect(runCli(dir, ['scaffold']).status).toBe(0)
-    writePayloadConfig(dir)
+    const scaffold = runCli(dir, ['scaffold', exportFile])
+    expect(scaffold.status, scaffold.output).toBe(0)
+    writePayloadConfig(dir, '', ['posts', 'pages', 'guides', 'recipes'])
+    // Archives of the custom taxonomy get new URLs; its old base is the rewrite slug.
+    writeFileSync(
+      join(dir, 'wp-to-payload.config.json'),
+      JSON.stringify({
+        taxonomies: {
+          recipe_category: { base: 'rezeptkategorie', path: '/rezepte/kategorie/:path' },
+        },
+      }),
+    )
   })
 
   afterAll(() => {
@@ -86,10 +108,13 @@ describe.skipIf(!projectInstalled())('import of a real WordPress export', () => 
       categories: { created: 5 },
       tags: { created: 2 },
       authors: { created: 3 },
+      'recipe-categories': { created: 3 },
       // Eight posts, one of them in the trash.
       posts: { created: 7, failed: 0 },
       pages: { created: 3, failed: 0 },
-      redirects: { created: 4 },
+      guides: { created: 2, failed: 0 },
+      recipes: { created: 2, failed: 0 },
+      redirects: { created: 11 },
     })
     const codes = new Set(r.warnings.map((w) => w.code))
     expect([...codes].sort()).toEqual(['BLOCK_REMOVED', 'PASSWORD_PROTECTED', 'SHORTCODE_REMOVED'])
@@ -104,6 +129,15 @@ describe.skipIf(!projectInstalled())('import of a real WordPress export', () => 
       const draft = await one('posts', 12)
       const pending = await one('posts', 16)
       const secret = await one('posts', 15)
+      const rye = await one('recipes', 19)
+      const rolls = await one('recipes', 20)
+      const ryeFlour = await one('guides', 29)
+      const links = (root: any) => {
+        const found: string[] = []
+        const walk = (n: any) => { if (n.type === 'link') found.push(n.fields.url); (n.children ?? []).forEach(walk) }
+        walk(root)
+        return found
+      }
       return {
         hello: {
           slug: hello.slug, status: hello._status, author: hello.author?.name,
@@ -116,6 +150,16 @@ describe.skipIf(!projectInstalled())('import of a real WordPress export', () => 
         pending: { slug: pending.slug, status: pending._status },
         secret: secret._status,
         bread: (await payload.find({ collection: 'categories', where: { slug: { equals: 'brot' } }, depth: 1 })).docs[0]?.parent?.slug,
+        rye: {
+          slug: rye.slug, status: rye._status, author: rye.author?.name, excerpt: rye.excerpt,
+          featured: rye.featuredImage?.filename, categories: rye.recipeCategories.map((c: any) => c.slug).sort(),
+        },
+        rollsLinks: links(rolls.content.root),
+        rye_flour: { parent: ryeFlour.parent?.slug, links: links(ryeFlour.content.root) },
+        sourdoughBread: (await payload.find({ collection: 'recipe-categories', where: { slug: { equals: 'sauerteigbrot' } }, depth: 1 })).docs[0]?.parent?.slug,
+        redirects: (await payload.find({ collection: 'redirects', depth: 0, pagination: false, sort: 'from' })).docs
+          .filter((d: any) => !d.from.startsWith('/20'))
+          .map((d: any) => d.from + ' ' + (d.to.type === 'reference' ? d.to.reference.relationTo : d.to.url)),
       }`,
     )
     expect(data.hello).toEqual({
@@ -149,15 +193,38 @@ describe.skipIf(!projectInstalled())('import of a real WordPress export', () => 
     expect(data.pending).toEqual({ slug: 'wartet-auf-freigabe', status: 'draft' })
     expect(data.secret).toBe('draft')
     expect(data.bread).toBe('rezepte')
+
+    // A custom post type with its own hierarchical taxonomy.
+    expect(data.rye).toEqual({
+      slug: 'roggenbrot',
+      status: 'published',
+      author: 'Anna Beispiel',
+      excerpt: 'Kräftig und saftig.',
+      featured: 'brot.png',
+      categories: ['brot', 'sauerteigbrot'],
+    })
+    expect(data.sourdoughBread).toBe('brot')
+    expect(data.rollsLinks).toEqual(['/recipes/roggenbrot', '/rezepte/kategorie/suesses'])
+    // A hierarchical custom post type.
+    expect(data.rye_flour).toEqual({ parent: 'mehlsorten', links: ['/recipes/roggenbrot'] })
+    expect(data.redirects).toEqual([
+      '/ratgeber/mehlsorten/ guides',
+      '/ratgeber/mehlsorten/roggenmehl/ guides',
+      '/rezepte/roggenbrot/ recipes',
+      '/rezepte/zimtschnecken/ recipes',
+      '/rezeptkategorie/brot/ /rezepte/kategorie/brot',
+      '/rezeptkategorie/sauerteigbrot/ /rezepte/kategorie/brot/sauerteigbrot',
+      '/rezeptkategorie/suesses/ /rezepte/kategorie/suesses',
+    ])
   })
 
   it('updates everything on a second run', () => {
     const run = runCli(dir, args)
     expect(run.status, run.output).toBe(0)
     const phases = report().phases
-    for (const phase of ['media', 'categories', 'tags', 'authors', 'posts', 'pages', 'redirects']) {
-      expect(phases[phase]?.created, phase).toBe(0)
-    }
+    for (const phase of Object.keys(phases)) expect(phases[phase]?.created, phase).toBe(0)
     expect(phases.posts?.updated).toBe(7)
+    expect(phases.recipes?.updated).toBe(2)
+    expect(phases['recipe-categories']?.updated).toBe(3)
   })
 })

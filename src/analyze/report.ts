@@ -28,6 +28,32 @@ export interface Detection {
   details?: Record<string, number | string | string[]>
 }
 
+/** A custom post type and what the import does with it. */
+export interface CustomPostType {
+  name: string
+  items: number
+  byStatus: Record<string, number>
+  /** Its items have parents of the same type, like pages. */
+  hierarchical: boolean
+  /** Taxonomies of the terms on its items. */
+  taxonomies: string[]
+  /** `import` brings it over, into a collection of its own unless the config says otherwise. */
+  imported: boolean
+  /** Why it is not imported: plugin data such as forms or templates. */
+  reason?: string
+}
+
+/** A taxonomy other than categories, tags and menus, and what the import does with it. */
+export interface CustomTaxonomy {
+  name: string
+  terms: number
+  hierarchical: boolean
+  /** Post types whose items use its terms. */
+  postTypes: string[]
+  imported: boolean
+  reason?: string
+}
+
 export interface ComplexityReason {
   points: number
   reason: string
@@ -55,8 +81,10 @@ export interface AnalyzeReport {
     authors: number
     comments: number
     menuItems: number
+    /** Items per custom post type that the import brings over. */
     customPostTypes: Record<string, number>
   }
+  customTypes: { postTypes: CustomPostType[]; taxonomies: CustomTaxonomy[] }
   content: {
     gutenbergItems: number
     classicItems: number
