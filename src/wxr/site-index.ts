@@ -1,4 +1,5 @@
 import type { Readable } from 'node:stream'
+import { type WpmlKeys, wpmlKeysOf } from '../languages.js'
 import { decodeEntities } from '../util/entities.js'
 import { mimeTypeOf } from '../util/mime.js'
 import { slugify } from '../util/slug.js'
@@ -17,6 +18,9 @@ export interface IndexedAttachment {
   alt?: string
   caption?: string
   parentId: number
+  link: string
+  /** Terms of the attachment; multilingual plugins give media a language. */
+  terms: WxrItemTerm[]
 }
 
 /** Everything about a post or page except its content, enough to resolve links and redirects. */
@@ -35,6 +39,10 @@ export interface IndexedPost {
   authorLogin: string
   terms: WxrItemTerm[]
   oldSlugs: string[]
+  /** Language and translation group from WPML Export and Import, when the export has them. */
+  wpml?: WpmlKeys
+  /** The item has WPML's own meta (`_icl_…`), so the site used WPML. */
+  wpmlTraces?: boolean
 }
 
 export interface SiteIndex {
@@ -72,6 +80,8 @@ export const indexAttachment = (item: WxrItem): IndexedAttachment | undefined =>
     mimeType: mimeTypeOf(url),
     title: decodeEntities(item.title),
     parentId: item.parentId,
+    link: item.link,
+    terms: item.terms,
   }
   const file = metaValue(item, '_wp_attached_file')
   if (file) attachment.file = file
@@ -100,7 +110,14 @@ export const indexPost = (item: WxrItem): IndexedPost => {
     oldSlugs: (item.meta.get('_wp_old_slug') ?? [])
       .map((s) => safeDecode(s.trim()))
       .filter(Boolean),
+    ...wpmlOf(item),
   }
+}
+
+const wpmlOf = (item: WxrItem): Pick<IndexedPost, 'wpml' | 'wpmlTraces'> => {
+  const wpml = wpmlKeysOf(item.meta)
+  const traces = [...item.meta.keys()].some((k) => k.startsWith('_icl_') || k.startsWith('_wpml_'))
+  return { ...(wpml ? { wpml } : {}), ...(traces ? { wpmlTraces: true } : {}) }
 }
 
 /** WordPress stores non-ASCII slugs percent-encoded. */

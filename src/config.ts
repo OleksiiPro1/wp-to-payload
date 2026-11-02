@@ -55,6 +55,16 @@ export interface TaxonomySettings {
   hierarchical?: boolean
 }
 
+/** How the languages of a multilingual site become Payload locales. */
+export interface LocalizationSettings {
+  /** WordPress language code of the default language (`de`). Default: detected from the URLs. */
+  defaultLanguage?: string
+  /** WordPress language code → Payload locale code. Default: the same code. */
+  locales: Record<string, string>
+  /** Put the default language into new URLs too (`/de/ueber-uns`). Default: false. */
+  prefixDefaultLanguage: boolean
+}
+
 export interface Config {
   /** New URL path per WordPress type (`post`, `page`, `category`, `tag`, custom types). */
   paths: PathPatterns
@@ -66,6 +76,7 @@ export interface Config {
   postTypes: Record<string, PostTypeSettings>
   /** Custom taxonomies, by WordPress name. */
   taxonomies: Record<string, TaxonomySettings>
+  localization: LocalizationSettings
   seo: { separator: string }
   media: {
     /** Hosts media may be downloaded from besides the site itself (for example a CDN). */
@@ -103,6 +114,7 @@ export const DEFAULT_CONFIG: Config = {
   },
   postTypes: {},
   taxonomies: {},
+  localization: { locales: {}, prefixDefaultLanguage: false },
   seo: { separator: '-' },
   media: { hosts: [] },
   importAuthorEmails: false,
@@ -144,6 +156,7 @@ const KNOWN_KEYS = new Set([
   'seo',
   'media',
   'importAuthorEmails',
+  'localization',
 ])
 
 type SettingType = 'string' | 'pattern' | 'boolean'
@@ -256,6 +269,25 @@ export const parseConfig = (raw: unknown, source = CONFIG_FILE): Config => {
   if (raw.importAuthorEmails !== undefined && typeof raw.importAuthorEmails !== 'boolean') {
     throw new ConfigError(`${source}: importAuthorEmails must be true or false`)
   }
+  const localization = raw.localization === undefined ? {} : raw.localization
+  if (!isObject(localization)) throw new ConfigError(`${source}: localization must be an object`)
+  for (const key of Object.keys(localization)) {
+    if (!['defaultLanguage', 'locales', 'prefixDefaultLanguage'].includes(key)) {
+      throw new ConfigError(`${source}: localization: unknown setting "${key}"`)
+    }
+  }
+  if (
+    localization.defaultLanguage !== undefined &&
+    (typeof localization.defaultLanguage !== 'string' || localization.defaultLanguage === '')
+  ) {
+    throw new ConfigError(`${source}: localization.defaultLanguage must be a language code`)
+  }
+  if (
+    localization.prefixDefaultLanguage !== undefined &&
+    typeof localization.prefixDefaultLanguage !== 'boolean'
+  ) {
+    throw new ConfigError(`${source}: localization.prefixDefaultLanguage must be true or false`)
+  }
   return {
     paths,
     siteHosts: stringList(raw.siteHosts, 'siteHosts'),
@@ -268,6 +300,13 @@ export const parseConfig = (raw: unknown, source = CONFIG_FILE): Config => {
     },
     media: { hosts: stringList(media.hosts, 'media.hosts') },
     importAuthorEmails: raw.importAuthorEmails === true,
+    localization: {
+      ...(typeof localization.defaultLanguage === 'string'
+        ? { defaultLanguage: localization.defaultLanguage }
+        : {}),
+      locales: stringRecord(localization.locales, 'localization.locales'),
+      prefixDefaultLanguage: localization.prefixDefaultLanguage === true,
+    },
   }
 }
 
