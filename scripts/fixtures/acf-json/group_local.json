@@ -1,0 +1,27 @@
+{
+  "key": "group_local_origin",
+  "title": "Herkunft",
+  "fields": [
+    {
+      "key": "field_local_origin",
+      "label": "Herkunft",
+      "name": "origin",
+      "type": "text",
+      "instructions": "",
+      "required": 0
+    },
+    {
+      "key": "field_local_region",
+      "label": "Region",
+      "name": "region",
+      "type": "select",
+      "choices": { "nord": "Norden", "sued": "Süden" },
+      "default_value": "",
+      "multiple": 0
+    }
+  ],
+  "location": [[{ "param": "post_type", "operator": "==", "value": "recipe" }]],
+  "menu_order": 10,
+  "active": true,
+  "description": "Defined in code (local JSON), so it is not in the export."
+}

@@ -21,6 +21,7 @@ version="$2"
 case "$slug" in
   polylang) repo=https://github.com/polylang/polylang tag="$version" ;;
   advanced-custom-fields) repo=https://github.com/AdvancedCustomFields/acf tag="$version" ;;
+  secure-custom-fields) repo=https://github.com/WordPress/secure-custom-fields tag="$version" ;;
   elementor) repo=https://github.com/elementor/elementor tag="v$version" ;;
   *)
     echo "no Git repository known for the plugin $slug; add it to $0" >&2
