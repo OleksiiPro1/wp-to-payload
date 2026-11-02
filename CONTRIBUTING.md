@@ -75,7 +75,11 @@ write. `scripts/fixtures/generate.sh` builds them:
 
 1. It starts WordPress, MariaDB and WP-CLI in Docker, from the official images in pinned
    versions (`scripts/fixtures/compose.yaml`).
-2. It installs WordPress and the plugins the scenario names, from wordpress.org.
+2. It installs WordPress and the plugins the scenario names, in the versions it names. They
+   come from wordpress.org. When wordpress.org cannot be reached, `scripts/fixtures/plugins.sh`
+   builds the same version from the plugin's official Git repository (the release tag, plus
+   its runtime Composer packages) and installs that zip. `WP2P_PLUGIN_SOURCE=wordpress.org` or
+   `git` picks one explicitly. The Git route needs `git`, `zip`, PHP and Composer.
 3. It runs the scenario's PHP script (`scripts/fixtures/scenarios/<name>.php`) with
    `wp eval-file`. The script creates all content with fixed dates.
 4. It exports the site twice: `<name>.xml` with WordPress's own exporter (what Tools → Export
@@ -92,9 +96,10 @@ scripts/fixtures/generate.sh core
 
 Without arguments it builds every scenario. Docker Hub limits anonymous image pulls; with
 `WP2P_REGISTRY=mirror.gcr.io/library` the images come from Google's mirror of the official
-images. A run takes about 20 seconds per scenario and gives the same files every time, unless
-an image or plugin version changed. After regenerating, run all tests and review the diff of
-the XML files.
+images. A run takes 20 to 60 seconds per scenario and gives the same content every time,
+unless an image or plugin version changed. WordPress's exporter may list two terms with the
+same name (Polylang's `language` and `term_language` terms) in either order. After
+regenerating, run all tests and review the diff of the XML files.
 
 To add a scenario, create `scripts/fixtures/scenarios/<name>.php`. Its header comment sets the
 site title and the plugins to install:
@@ -103,7 +108,7 @@ site title and the plugins to install:
 <?php
 /**
  * Title: Beispiel GmbH
- * Plugins: polylang
+ * Plugins: polylang@3.9.1, advanced-custom-fields@6.8.11
  */
 require __DIR__ . '/../lib/fixtures.php';
 ```
@@ -114,7 +119,10 @@ test sites, such as the custom post types of the `core` scenario.
 
 - Content is synthetic, like all fixtures: made-up names and texts, `example.com` addresses.
   The admin password is random, and exports contain no user passwords.
-- Plugins are only installed into the throwaway site. Their code never enters this repository.
+- Plugins are only installed into the throwaway site. Their code never enters this repository;
+  `plugins.sh` builds them in `scripts/fixtures/out/`, which git ignores.
+- Plugins that name things with random IDs (Polylang's translation groups) get stable names in
+  the scenario script, so the exports stay comparable.
 
 ## Changes
 
