@@ -54,6 +54,12 @@ export const printSummary = (r: AnalyzeReport): void => {
       `  ACF fields   ${c.groups.length} groups; ${imported} fields in ${c.collections.map((x) => x.collection).join(', ') || 'no collection'}${skipped > 0 ? `, ${skipped} not imported` : ''}${c.undefinedValues.length > 0 ? `, ${c.undefinedValues.length} without a definition` : ''}`,
     )
   }
+  const menus = r.menus.filter((m) => m.items > 0)
+  if (menus.length > 0) {
+    out(
+      `  Menus        ${menus.map((m) => `${m.name} → ${m.global ? `${m.global}${m.language ? ` (${m.language})` : ''}` : 'not imported'}`).join(', ')}`,
+    )
+  }
   const pluginData = r.customTypes.postTypes.filter((t) => !t.imported)
   if (pluginData.length > 0) {
     out(
