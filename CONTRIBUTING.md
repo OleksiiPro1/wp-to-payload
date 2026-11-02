@@ -150,8 +150,10 @@ code, as themes do; it is not in the export, and the tests pass it with `--acf-j
 Releases are published to npm by [`.github/workflows/publish.yml`](.github/workflows/publish.yml)
 when a version tag is pushed. It uses npm trusted publishing: npm trusts the workflow through
 GitHub's OIDC token, so there is no npm token in the repository, and every release gets a
-provenance attestation. The first version, 0.1.0, is published by hand; trusted publishing is
-configured in the package's settings on npmjs.com.
+provenance attestation. Trusted publishing is configured in the package's settings on
+npmjs.com, so the package has to exist there first: the first version on npm, 0.2.0, is
+published by hand (0.1.0 was never published), and the workflow publishes every version after
+it.
 
 1. On a branch, prepare the release:
 
@@ -178,7 +180,7 @@ configured in the package's settings on npmjs.com.
 
 4. Create a GitHub release from the tag with the changelog entry.
 
-A tag for a version that is already on npm (for example `v0.1.0`, published by hand) ends the
+A tag for a version that is already on npm (for example `v0.2.0`, published by hand) ends the
 workflow without publishing, so such tags can be added for the history.
 
 If the workflow fails before publishing, fix the problem on `main` through a pull request,

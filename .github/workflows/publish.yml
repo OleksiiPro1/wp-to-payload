@@ -36,7 +36,7 @@ jobs:
       - name: Check versions, tag and branch
         run: node scripts/check-release.mjs
       # A version can be published only once; tagging a version that is already on npm (such
-      # as 0.1.0, published by hand) ends the run here instead of failing.
+      # as 0.2.0, the first version, published by hand) ends the run here instead of failing.
       - name: Skip versions that are already on npm
         id: npm
         run: |
