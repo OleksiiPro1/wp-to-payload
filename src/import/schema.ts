@@ -35,6 +35,26 @@ export class CollectionSchema {
     return (parent?.flattenedFields ?? parent?.fields)?.find((f) => f.name === name)
   }
 
+  /**
+   * A field anywhere in the collection: field names, with `{ block }` for the block of a blocks
+   * field (`['sections', { block: 'quote' }, 'text']`).
+   */
+  fieldAt(path: (string | { block: string })[]): PayloadField | undefined {
+    let fields: PayloadField[] | undefined = [...this.fields.values()]
+    let current: PayloadField | undefined
+    for (const segment of path) {
+      if (typeof segment === 'string') {
+        current = fields?.find((f) => f.name === segment)
+        fields = current?.flattenedFields ?? current?.fields
+      } else {
+        const block = current?.blocks?.find((b) => b.slug === segment.block)
+        fields = block?.flattenedFields ?? block?.fields
+        current = undefined
+      }
+    }
+    return current
+  }
+
   /** Whether a relationship or upload field can point to `collection`. */
   relatesTo(name: string, collection: string): boolean {
     const field = this.fields.get(name)

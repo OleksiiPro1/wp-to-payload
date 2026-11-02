@@ -16,6 +16,8 @@ export interface PayloadField {
   fields?: PayloadField[]
   options?: (string | { value: string })[]
   defaultValue?: unknown
+  /** Blocks of a blocks field. */
+  blocks?: { slug: string; fields?: PayloadField[]; flattenedFields?: PayloadField[] }[]
 }
 
 export interface PayloadCollection {

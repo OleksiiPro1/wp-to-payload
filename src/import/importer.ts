@@ -1,3 +1,8 @@
+import { AcfJsonError, loadAcfJson } from '../acf/definitions.js'
+import type { AcfPayloadField } from '../acf/plan.js'
+import { planSiteAcf } from '../acf/site.js'
+import { commonOffset, localToIso, type SiteTime } from '../acf/time.js'
+import { type AcfValueContext, acfValues } from '../acf/values.js'
 import { detectBuilders } from '../content/builders.js'
 import { MediaMatcher } from '../content/media-match.js'
 import { prepareContent } from '../content/pipeline.js'
@@ -27,6 +32,7 @@ import type {
   DocId,
   LexicalModule,
   PayloadDoc,
+  PayloadField,
   PayloadLike,
   SanitizedEditorConfig,
 } from './payload-types.js'
@@ -84,6 +90,8 @@ export class ImportSetupError extends Error {
 }
 
 const IMPORTED_STATUSES = new Set(['publish', 'draft', 'pending', 'private', 'future'])
+/** Plugin types whose items are read as settings: ACF's field definitions. */
+const DEFINITION_TYPES = new Set(['acf-field-group', 'acf-field'])
 const WRITE_CONTEXT = { wpToPayload: true, disableRevalidate: true }
 
 const toIso = (value: string): string | undefined => {
@@ -118,6 +126,28 @@ const sortByParent = (terms: WxrTerm[]): WxrTerm[] => {
   }
   for (const term of terms) visit(term, new Set())
   return out
+}
+
+/** Why a Payload field cannot take the values of an ACF field, or undefined when it can. */
+const acfMismatch = (field: AcfPayloadField, own: PayloadField): string | undefined => {
+  const expected =
+    field.type === 'link'
+      ? ['group']
+      : field.type === 'text' || field.type === 'textarea'
+        ? ['text', 'textarea']
+        : [field.type]
+  if (!expected.includes(own.type)) return `is a ${own.type} field`
+  if (field.type === 'upload' || field.type === 'relationship') {
+    const to = Array.isArray(own.relationTo)
+      ? own.relationTo
+      : own.relationTo
+        ? [own.relationTo]
+        : []
+    if (!field.relationTo.some((c) => to.includes(c))) {
+      return `points to ${to.join(', ') || 'nothing'}, not to ${field.relationTo.join(', ')}`
+    }
+  }
+  return undefined
 }
 
 /** How an imported document is found again: its WordPress ID, or its slug when there is none. */
@@ -161,7 +191,23 @@ export const importExport = async (
       `${index.issues.length} XML errors in the export were skipped; run analyze for details.`,
     )
   }
-  const { types, languages, urls } = describeSite(index, config)
+  const { types, languages, urls, survey } = describeSite(index, config)
+  const acfJson = await loadAcfJson(config.acfJson).catch((error: unknown) => {
+    throw error instanceof AcfJsonError ? new ImportSetupError(error.message) : error
+  })
+  const acf = planSiteAcf({
+    acf: index.acf,
+    json: acfJson,
+    config,
+    types,
+    survey,
+    typeOfPost: (id) => index.posts.get(id)?.type,
+    localized: languages !== undefined,
+  })
+  const siteTime: SiteTime = {
+    ...(config.timeZone ? { timeZone: config.timeZone } : {}),
+    offsetMinutes: commonOffset(index.acf.utcOffsets),
+  }
   const locales = languages ? importLocales(languages, config, payload.config) : undefined
   if (languages && locales) {
     log(
@@ -279,7 +325,7 @@ export const importExport = async (
   // Items of plugin types are not content; say so once per type when documents are imported.
   if (types.postTypes.some((t) => selected.has(t.phase))) {
     for (const s of types.skipped) {
-      if (s.kind !== 'post type' || s.count === 0) continue
+      if (s.kind !== 'post type' || s.count === 0 || DEFINITION_TYPES.has(s.name)) continue
       warnings
         .for({ wpType: s.name })
         .add(
@@ -337,6 +383,41 @@ export const importExport = async (
     throw new ImportSetupError(
       'none of the target collections exist; run `wp-to-payload scaffold` first',
     )
+
+  // ACF fields that are not imported or renamed, once per collection that is written.
+  const writtenCollections = new Set(
+    [...phaseCollection].filter(([phase]) => selected.has(phase)).map(([, slug]) => slug),
+  )
+  for (const note of acf.notes) {
+    if (writtenCollections.has(note.collection)) {
+      warnings.add(note.code, note.message, `${note.collection}.${note.path}`)
+    }
+  }
+  const phaseOfTarget = new Map<string, Phase>([
+    ...types.postTypes.map((t): [string, Phase] => [`post:${t.wpType}`, t.phase]),
+    ...types.taxonomies.map((t): [string, Phase] => [`term:${t.taxonomy}`, t.phase]),
+  ])
+  const undefinedByTarget = new Map<string, typeof acf.undefinedValues>()
+  for (const value of acf.undefinedValues) {
+    const phase = phaseOfTarget.get(value.target)
+    if (!phase || !selected.has(phase)) continue
+    undefinedByTarget.set(value.target, [...(undefinedByTarget.get(value.target) ?? []), value])
+  }
+  for (const [target, values] of undefinedByTarget) {
+    const [kind, name = target] = target.split(':')
+    const listed = values
+      .slice(0, 10)
+      .map((v) => `${v.name} (${v.key})`)
+      .join(', ')
+    const more = values.length > 10 ? ` and ${values.length - 10} more` : ''
+    warnings
+      .for({ wpType: name })
+      .add(
+        'ACF_FIELD_UNKNOWN',
+        `${kind === 'term' ? 'Terms' : 'Items'} of ${name} have values of ACF fields that are not defined in the export: ${listed}${more}. They were not imported; pass the field groups with --acf-json (a theme's acf-json folder or an ACF export).`,
+        name,
+      )
+  }
 
   const mediaIdType: 'number' | 'text' = (() => {
     const db = (payload as { db?: { defaultIDType?: string } }).db
@@ -501,6 +582,121 @@ export const importExport = async (
     if (done === total || done % 50 === 0) log(`  ${phase}: ${done}/${total}`)
   }
 
+  /** Documents of imported items by WordPress ID, the IDs of all language versions included. */
+  const docIds = new Map<number, { collection: string; id: DocId }>()
+
+  // ACF fields --------------------------------------------------------------------------------
+  /** The ACF fields of a collection that its Payload schema has, as the schema shapes them. */
+  const acfFields = new Map<string, AcfPayloadField[]>()
+  const acfFieldsFor = (schema: CollectionSchema): AcfPayloadField[] => {
+    const cached = acfFields.get(schema.slug)
+    if (cached) return cached
+    const fields: AcfPayloadField[] = []
+    for (const field of acf.collections.get(schema.slug)?.fields ?? []) {
+      const own = schema.field(field.name)
+      if (!own) {
+        reportMissing(schema.slug, [field.name])
+        continue
+      }
+      const problem = acfMismatch(field, own)
+      if (problem) {
+        warnings.add(
+          'ACF_FIELD_SKIPPED',
+          `Field "${field.name}" of collection "${schema.slug}" ${problem}; the values of the ACF field "${field.acf.name}" (${field.acf.type}) were not imported.`,
+          `${schema.slug}.${field.name}`,
+        )
+        continue
+      }
+      const shaped = { ...field }
+      if (field.type === 'upload' || field.type === 'relationship' || field.type === 'select') {
+        shaped.hasMany = own.hasMany === true
+      }
+      if (field.type === 'upload' || field.type === 'relationship') {
+        const to = Array.isArray(own.relationTo) ? own.relationTo : [own.relationTo ?? '']
+        shaped.relationTo = field.relationTo.filter((c) => to.includes(c))
+        shaped.polymorphic = Array.isArray(own.relationTo)
+      }
+      fields.push(shaped)
+    }
+    acfFields.set(schema.slug, fields)
+    return fields
+  }
+  const termSlugs = new Map<string, string>()
+  for (const t of index.terms)
+    if (t.id !== undefined) termSlugs.set(`${t.taxonomy}:${t.id}`, t.slug)
+  const acfEditors = new Map<string, { config: SanitizedEditorConfig; info: EditorInfo } | null>()
+  /** How ACF values of an item or term find media, documents, terms and editors. */
+  const acfContext = (
+    schema: CollectionSchema,
+    meta: Map<string, string[]>,
+    postId: number,
+    itemWarnings: WarningCollector,
+    final: boolean,
+  ): AcfValueContext => ({
+    meta,
+    media: (wpId) => mediaIds.get(wpId),
+    mediaByUrl: (url) => matcher.match(url),
+    post: (wpId) => docIds.get(wpId),
+    term: (taxonomy, termId) => {
+      const slug = termSlugs.get(`${taxonomy}:${termId}`)
+      const id = slug === undefined ? undefined : termIds.get(termKey(taxonomy, slug))
+      const target = types.taxonomies.find((t) => t.taxonomy === taxonomy)
+      return id === undefined || !target ? undefined : { collection: target.collection, id }
+    },
+    findPost: (url) => urls.findPost(url),
+    rewriteUrl: (url) => {
+      const file = matcher.match(url)
+      return urls.rewriteHref(url) ?? (file === undefined ? undefined : mediaUrls.get(file)) ?? url
+    },
+    richText: (html, path) => {
+      const key = `${schema.slug}:${JSON.stringify(path)}`
+      let editor = acfEditors.get(key)
+      if (editor === undefined) {
+        const field = schema.fieldAt(path)
+        const editorConfig =
+          field?.type === 'richText' ? lexical.editorConfigFactory.fromField({ field }) : undefined
+        editor = editorConfig ? { config: editorConfig, info: describeEditor(editorConfig) } : null
+        acfEditors.set(key, editor)
+      }
+      if (!editor) return undefined
+      const ctx: ContentContext = {
+        postId,
+        urls,
+        media: matcher,
+        attachmentsOf: (id) => attachmentsByParent.get(id) ?? [],
+        mediaId: (wpId) => mediaIds.get(wpId),
+        mediaUrl: (wpId) => mediaUrls.get(wpId),
+        mediaCollection: slugs.media,
+        capabilities: editor.info.capabilities,
+        builders: [],
+        warnings: itemWarnings,
+      }
+      const state = htmlToLexical(
+        prepareContent(html, ctx),
+        lexical,
+        editor.config,
+        editor.info,
+        mediaIdType,
+      )
+      return isEmptyState(state) ? null : state
+    },
+    dateTime: (value) => localToIso(value, siteTime),
+    final,
+    warn: (code, message, subject) => itemWarnings.add(code, message, subject),
+  })
+  /** Documents with ACF references to items imported after them; set once all exist. */
+  const pendingAcf: {
+    phase: Phase
+    schema: CollectionSchema
+    id: DocId
+    locale: string | null
+    status?: string
+    fields: AcfPayloadField[]
+    meta: Map<string, string[]>
+    postId: number
+    context: Pick<Warning, 'wpId' | 'wpType'>
+  }[] = []
+
   // Media ------------------------------------------------------------------------------------
   const mediaIds = new Map<number, DocId>()
   /** URLs of imported files, so links to them in content point to Payload. */
@@ -646,22 +842,53 @@ export const importExport = async (
         slug: term.slug,
         description: term.description,
       }
+      const termAcf = acfFieldsFor(schema)
+      const context = { wpType: taxonomy, ...(term.id === undefined ? {} : { wpId: term.id }) }
+      let acfPending: AcfPayloadField[] = []
+      if (termAcf.length > 0) {
+        const values = acfValues(
+          termAcf,
+          acfContext(schema, term.meta, 0, warnings.for(context), false),
+        )
+        Object.assign(data, values.data)
+        acfPending = termAcf.filter((f) => values.pending.has(f.name))
+      }
       if (isPrimary(term)) {
         if (parentId !== undefined && schema.relatesTo('parent', slug)) {
           data.parent = schema.relationValue('parent', slug, [parentId])
         }
       } else {
         const part = schema.localizedPart(data)
-        reportNotLocalized(schema.slug, part.dropped)
+        const translatable = new Set([
+          'title',
+          'slug',
+          'description',
+          ...termAcf.map((a) => a.name),
+        ])
+        reportNotLocalized(
+          schema.slug,
+          part.dropped.filter((k) => translatable.has(k)),
+        )
         data = part.data
+        acfPending = acfPending.filter((a) => schema.isLocalized(a.name))
       }
       if (typeof key === 'number')
         Object.assign(data, idFields(schema, unit.length > 0 ? unit : [key]))
-      const id = await upsert(phase, schema, key, data, {
-        locale: localeOfTerm(term.id) ?? null,
-        unit,
-      })
+      const locale = localeOfTerm(term.id) ?? null
+      const id = await upsert(phase, schema, key, data, { locale, unit })
       if (id !== undefined) termIds.set(termKey(taxonomy, term.slug), id)
+      if (id !== undefined && acfPending.length > 0) {
+        pendingAcf.push({
+          phase,
+          schema,
+          id,
+          locale,
+          fields: acfPending,
+          meta: term.meta,
+          postId: 0,
+          context,
+        })
+      }
       progress(phase, done, importable.length)
     }
   }
@@ -696,7 +923,6 @@ export const importExport = async (
 
   // Posts, pages and other post types -------------------------------------------------------
   const typeOf = new Map(types.postTypes.map((t) => [t.wpType, t]))
-  const docIds = new Map<number, { collection: string; id: DocId }>()
   /** Status written for each hierarchical document, kept when its parent is set afterwards. */
   const statusOf = new Map<number, string>()
   const editors = new Map<string, { config: SanitizedEditorConfig; info: EditorInfo }>()
@@ -794,7 +1020,7 @@ export const importExport = async (
     item: WxrItem,
     schema: CollectionSchema,
     plan: UnitPlan = planOf(item.id),
-  ): { data: Record<string, unknown>; draft: boolean } => {
+  ): { data: Record<string, unknown>; draft: boolean; acfPending: AcfPayloadField[] } => {
     const itemWarnings = warnings.for({ wpId: item.id, wpType: item.type })
     const published = item.status === 'publish' && !item.hasPassword
     if (item.hasPassword) {
@@ -892,10 +1118,29 @@ export const importExport = async (
     }
     if (seo.noindex && schema.subField(f.meta, 'noIndex')) meta.noIndex = true
     if (Object.keys(meta).length > 0) data[f.meta] = meta
+
+    const acfFields = acfFieldsFor(schema)
+    let acfPending: AcfPayloadField[] = []
+    if (acfFields.length > 0) {
+      const values = acfValues(
+        acfFields,
+        acfContext(schema, item.meta, item.id, itemWarnings, false),
+      )
+      Object.assign(data, values.data)
+      acfPending = acfFields.filter((a) => values.pending.has(a.name))
+    }
     if (item.id !== plan.primary) {
       // A translation: only what Payload keeps per locale, plus the IDs and the status.
       const part = schema.localizedPart(data)
-      const translatable = new Set([f.title, f.slug, f.content, f.excerpt, f.featuredImage, f.meta])
+      const translatable = new Set([
+        f.title,
+        f.slug,
+        f.content,
+        f.excerpt,
+        f.featuredImage,
+        f.meta,
+        ...acfFields.map((a) => a.name),
+      ])
       reportNotLocalized(
         schema.slug,
         part.dropped.filter((k) => translatable.has(k)),
@@ -903,9 +1148,10 @@ export const importExport = async (
       return {
         data: { ...part.data, ...idFields(schema, plan.unit), _status: data._status },
         draft: data._status !== 'published',
+        acfPending: acfPending.filter((a) => schema.isLocalized(a.name)),
       }
     }
-    return { data, draft: data._status !== 'published' }
+    return { data, draft: data._status !== 'published', acfPending }
   }
 
   const selectedTypes = types.postTypes.filter((t) => selected.has(t.phase))
@@ -964,13 +1210,27 @@ export const importExport = async (
         })
         continue
       }
+      const locale = localeOfItem(item.id) ?? null
       const id = await upsert(type.phase, schema, plan.key, built.data, {
         draft: built.draft,
-        locale: localeOfItem(item.id) ?? null,
+        locale,
         unit: plan.unit,
       })
       if (id !== undefined) {
         for (const n of plan.unit) docIds.set(n, { collection: schema.slug, id })
+        if (built.acfPending.length > 0) {
+          pendingAcf.push({
+            phase: type.phase,
+            schema,
+            id,
+            locale,
+            status: String(built.data._status),
+            fields: built.acfPending,
+            meta: item.meta,
+            postId: item.id,
+            context: { wpId: item.id, wpType: item.type },
+          })
+        }
       }
       if (type.hierarchical && item.id === plan.primary) {
         statusOf.set(item.id, String(built.data._status))
@@ -1022,6 +1282,34 @@ export const importExport = async (
           })
         }
       }
+    }
+  }
+
+  // ACF references to items and terms that were imported after the document holding them.
+  for (const p of pendingAcf) {
+    const values = acfValues(
+      p.fields,
+      acfContext(p.schema, p.meta, p.postId, warnings.for(p.context), true),
+    )
+    if (options.dryRun || Object.keys(values.data).length === 0) continue
+    const drafts = p.schema.hasDrafts && p.status !== undefined
+    try {
+      await payload.update({
+        collection: p.schema.slug,
+        id: p.id,
+        data: { ...values.data, ...(drafts ? { _status: p.status } : {}) },
+        depth: 0,
+        overrideAccess: true,
+        context: WRITE_CONTEXT,
+        ...(drafts ? { draft: p.status === 'draft' } : {}),
+        ...(p.locale ? { locale: p.locale } : {}),
+      })
+    } catch (error) {
+      result.errors.push({
+        phase: p.phase,
+        ...(p.postId ? { wpId: p.postId } : {}),
+        message: `setting ACF references failed: ${errorMessage(error)}`,
+      })
     }
   }
 
