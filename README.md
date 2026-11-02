@@ -8,9 +8,11 @@ export file. No access to the old site is needed: no plugin, no API keys, no dat
 
 - **`analyze`** tells you what a site contains and how hard the move will be, before you start.
 - **`scaffold`** writes ready-made Payload collections for posts, pages, categories, tags,
-  authors and media, and for the site's custom post types and taxonomies.
+  authors and media, and for the site's custom post types and taxonomies, with their ACF
+  fields, and globals for the menus.
 - **`import`** brings everything into your Payload project through the Local API, with all
-  relations. Run it as often as you like: it updates what it imported before instead of
+  relations: content (also from Elementor), custom fields, menus, and every language of a
+  Polylang site. Run it as often as you like: it updates what it imported before instead of
   creating duplicates.
 - **`redirects`** maps every old URL to its new one, for Next.js, Apache, nginx, Netlify, the
   Payload redirects plugin, or as CSV and JSON.
@@ -483,9 +485,10 @@ The export is read twice as a stream. The first pass collects everything except 
 whatever order the file is in. The second pass converts and writes one post at a time.
 
 Content goes through four steps: the Gutenberg block comments are parsed (classic content gets
-paragraphs); shortcodes are replaced; the HTML is cleaned with jsdom (images matched to media,
-internal links rewritten, layout wrappers removed); and Payload's own `convertHTMLToLexical`
-turns it into Lexical, using the editor config of your `content` field.
+paragraphs, Elementor pages are turned into HTML from their widgets); shortcodes are replaced;
+the HTML is cleaned with jsdom (images matched to media, internal links rewritten, layout
+wrappers removed); and Payload's own `convertHTMLToLexical` turns it into Lexical, using the
+editor config of your `content` field. ACF's WYSIWYG fields take the same way.
 
 ## Alternatives
 
