@@ -43,6 +43,14 @@ export interface ScaffoldLocalization {
   defaultLocale: string
 }
 
+/** Globals for menus, with `navItems` links shaped like those of Payload's website template. */
+export interface ScaffoldGlobals {
+  /** Global slugs, such as `header` and `footer`. */
+  slugs: string[]
+  /** Collections a menu entry can link to. */
+  documents: string[]
+}
+
 export const NO_CUSTOM: ScaffoldCustom = {
   postTypes: [],
   taxonomies: [],
@@ -159,11 +167,100 @@ ${o.loc ? '    wpIds,\n' : ''}  ],
 }
 `
 
+/** Export names for globals: `header` → `Header`, unless a collection has that name. */
+const globalNames = (
+  globals: ScaffoldGlobals | undefined,
+  taken: string[],
+): Map<string, string> => {
+  const used = new Set(taken)
+  const names = new Map<string, string>()
+  for (const slug of globals?.slugs ?? []) {
+    const words = slug.split(/[^a-zA-Z0-9]+/).filter(Boolean)
+    let name = words.map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join('') || 'Menu'
+    if (!/^[A-Za-z]/.test(name)) name = `Wp${name}`
+    if (used.has(name)) name = `${name}Global`
+    const base = name
+    for (let n = 2; used.has(name); n++) name = `${base}${n}`
+    used.add(name)
+    names.set(slug, name)
+  }
+  return names
+}
+
+const linkField = (documents: string[]) => `
+/** A link in a menu, shaped like the link field of Payload's website template. */
+export const link: Field = {
+  name: 'link',
+  type: 'group',
+  fields: [
+    {
+      type: 'row',
+      fields: [
+        {
+          name: 'type',
+          type: 'radio',
+          defaultValue: 'reference',
+          options: [
+            { label: 'Internal link', value: 'reference' },
+            { label: 'Custom URL', value: 'custom' },
+          ],
+          admin: { layout: 'horizontal', width: '50%' },
+        },
+        { name: 'newTab', type: 'checkbox', label: 'Open in new tab', admin: { width: '50%' } },
+      ],
+    },
+    {
+      type: 'row',
+      fields: [
+        {
+          name: 'reference',
+          type: 'relationship',
+          relationTo: [${documents.map(q).join(', ')}],
+          label: 'Document to link to',
+          admin: {
+            condition: (_, siblingData) => siblingData?.type === 'reference',
+            width: '50%',
+          },
+        },
+        {
+          name: 'url',
+          type: 'text',
+          label: 'Custom URL',
+          admin: { condition: (_, siblingData) => siblingData?.type === 'custom', width: '50%' },
+        },
+        { name: 'label', type: 'text', label: 'Label', required: true, admin: { width: '50%' } },
+      ],
+    },
+  ],
+}
+`
+
+const globalFile = (exportName: string, slug: string, loc: string): string => `${header.replace(
+  /\n\/\/ Keep the wpId field.*\n$/,
+  '\n',
+)}import type { GlobalConfig } from 'payload'
+import { link } from './fields'
+
+/** A menu from WordPress. \`wp-to-payload import\` writes its entries into navItems. */
+export const ${exportName}: GlobalConfig = {
+  slug: ${q(slug)},
+  access: { read: () => true },
+  fields: [
+    {
+      name: 'navItems',
+      type: 'array',${loc ? '\n      localized: true,' : ''}
+      fields: [link],
+    },
+  ],
+}
+`
+
 export const scaffoldFiles = (
   slugs: CollectionSlugs,
   custom: ScaffoldCustom = NO_CUSTOM,
   localization?: ScaffoldLocalization,
   acf?: AcfPlan,
+  globals?: ScaffoldGlobals,
 ): ScaffoldFile[] => {
   const loc = localization ? ', localized: true' : ''
   const acfOf = (slug: string) => acf?.collections.get(slug)
@@ -171,7 +268,13 @@ export const scaffoldFiles = (
   const nameOf = (slug: string) => names.get(slug) ?? slug
   const taxonomyNames = custom.taxonomies.map((t) => nameOf(t.slug))
   const typeNames = custom.postTypes.map((t) => nameOf(t.slug))
-  const allNames = [...BUILTIN_NAMES, ...taxonomyNames, ...typeNames].sort()
+  const globalExports = globalNames(globals, [...BUILTIN_NAMES, ...taxonomyNames, ...typeNames])
+  const allNames = [
+    ...BUILTIN_NAMES,
+    ...taxonomyNames,
+    ...typeNames,
+    ...globalExports.values(),
+  ].sort()
   return [
     {
       name: 'fields.ts',
@@ -214,7 +317,7 @@ export const wpIds: Field = {
 }
 `
     : ''
-}`,
+}${globals && globals.slugs.length > 0 ? linkField(globals.documents) : ''}`,
     },
     {
       name: 'editor.ts',
@@ -356,6 +459,10 @@ export const Authors: CollectionConfig = {
         acf: acfOf(t.slug),
       }),
     })),
+    ...[...globalExports].map(([slug, name]) => ({
+      name: `${name}.ts`,
+      content: globalFile(name, slug, loc),
+    })),
     {
       name: 'index.ts',
       content: `${header}${allNames.map((n) => `import { ${n} } from './${n}'`).join('\n')}
@@ -377,7 +484,14 @@ export const wpCollections = ${wrapped(
         ],
         ']',
       )}
-`,
+${
+  globalExports.size > 0
+    ? `
+/** Globals for the WordPress menus. */
+export const wpGlobals = ${wrapped('[', [...globalExports.values()], ']')}
+`
+    : ''
+}`,
     },
   ]
 }
@@ -394,6 +508,7 @@ export const configSnippet = (
   importPath: string,
   custom: ScaffoldCustom = NO_CUSTOM,
   localization?: ScaffoldLocalization,
+  globals = false,
 ): string => {
   const documents = [slugs.posts, slugs.pages, ...custom.postTypes.map((t) => t.slug)]
     .map(q)
@@ -410,10 +525,10 @@ ${localization.locales.map((l) => `      { label: ${q(l.label)}, code: ${q(l.cod
     : ''
   return `import { seoPlugin } from '@payloadcms/plugin-seo'
 import { redirectsPlugin } from '@payloadcms/plugin-redirects'
-import { wpCollections } from '${importPath}'
+import { wpCollections${globals ? ', wpGlobals' : ''} } from '${importPath}'
 
 export default buildConfig({
-  collections: [...wpCollections /* , your other collections */],${locales}
+  collections: [...wpCollections /* , your other collections */],${globals ? '\n  globals: [...wpGlobals /* , your other globals */],' : ''}${locales}
   plugins: [
     seoPlugin({ collections: [${documents}], uploadsCollection: ${q(slugs.media)} }),
     redirectsPlugin({ collections: [${documents}] }),
