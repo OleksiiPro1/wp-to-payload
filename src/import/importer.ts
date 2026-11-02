@@ -12,8 +12,9 @@ import { slugify } from '../util/slug.js'
 import { metaValue, type WxrItem, type WxrTerm } from '../wxr/model.js'
 import { readWxr } from '../wxr/reader.js'
 import { buildSiteIndex, type IndexedAttachment, type SiteIndex } from '../wxr/site-index.js'
+import { type DocumentType, documentTypes } from './document-types.js'
 import { htmlToLexical, isEmptyState } from './lexical.js'
-import { type Phase, PHASES } from './phases.js'
+import { type Phase, phaseLabel, PHASES } from './phases.js'
 import { MediaSource } from './media.js'
 import type {
   DocId,
@@ -36,7 +37,7 @@ export interface ImportOptions {
   /** Phases to run. Redirects run only when listed here or with `writeRedirects`. */
   only: Phase[]
   writeRedirects: boolean
-  /** Write at most this many posts and this many pages. */
+  /** Write at most this many documents of each post type. */
   limit?: number
   concurrency: number
   refreshMedia: boolean
@@ -61,6 +62,7 @@ export interface ImportError {
 
 export interface ImportResult {
   dryRun: boolean
+  /** Counts per step, in the order the steps ran. */
   phases: Record<Phase, PhaseResult>
   errors: ImportError[]
   warnings: Warning[]
@@ -126,9 +128,19 @@ export const importExport = async (
   const { config, log } = options
   const f = config.fields
   const slugs = config.collections
+  const types = documentTypes(config)
+  // Every step and the collection it writes to, in the order the steps run.
+  const phaseCollection = new Map<Phase, string>([
+    ['media', slugs.media],
+    ['categories', slugs.categories],
+    ['tags', slugs.tags],
+    ['authors', slugs.authors],
+    ...types.map((t): [Phase, string] => [t.phase, t.collection]),
+    ['redirects', slugs.redirects],
+  ])
   const result: ImportResult = {
     dryRun: options.dryRun,
-    phases: Object.fromEntries(PHASES.map((p) => [p, emptyPhase()])) as Record<Phase, PhaseResult>,
+    phases: Object.fromEntries([...phaseCollection.keys()].map((p) => [p, emptyPhase()])),
     errors: [],
     warnings: [],
     durationMs: 0,
@@ -167,18 +179,11 @@ export const importExport = async (
 
   // Which phases run, and the collections they write to.
   const selected = new Set<Phase>(
-    options.only.length > 0 ? options.only : PHASES.filter((p) => p !== 'redirects'),
+    options.only.length > 0
+      ? options.only
+      : [...phaseCollection.keys()].filter((p) => p !== 'redirects'),
   )
   if (options.writeRedirects) selected.add('redirects')
-  const phaseCollection: Record<Phase, string> = {
-    media: slugs.media,
-    categories: slugs.categories,
-    tags: slugs.tags,
-    authors: slugs.authors,
-    posts: slugs.posts,
-    pages: slugs.pages,
-    redirects: slugs.redirects,
-  }
   const schemas = new Map<string, CollectionSchema>()
   const schemaOf = (slug: string): CollectionSchema | undefined => {
     if (schemas.has(slug)) return schemas.get(slug)
@@ -189,9 +194,8 @@ export const importExport = async (
   }
 
   const problems: string[] = []
-  for (const phase of PHASES) {
+  for (const [phase, slug] of phaseCollection) {
     if (!selected.has(phase)) continue
-    const slug = phaseCollection[phase]
     const schema = schemaOf(slug)
     if (!schema) {
       selected.delete(phase)
@@ -295,7 +299,7 @@ export const importExport = async (
       onWritten?: (doc: PayloadDoc) => void
     } = {},
   ): Promise<DocId | undefined> => {
-    const stats = result.phases[phase]
+    const stats = (result.phases[phase] ??= emptyPhase())
     const { data, missing } = schema.filter(raw)
     reportMissing(schema.slug, missing)
     const id = await existingId(schema, key)
@@ -394,10 +398,10 @@ export const importExport = async (
         const media = warnings.for({ wpId: a.id, wpType: 'attachment' })
         if (fileResult && !fileResult.ok) {
           if (fileResult.skipped) {
-            result.phases.media.skipped++
+            ;(result.phases.media ??= emptyPhase()).skipped++
             media.add('MEDIA_SKIPPED', `${a.url} skipped: ${fileResult.reason}`, a.url)
           } else {
-            result.phases.media.failed++
+            ;(result.phases.media ??= emptyPhase()).failed++
             media.add('MEDIA_FAILED', `${a.url} not imported: ${fileResult.reason}`, a.url)
           }
           const kept = ids.get(a.id)
@@ -422,7 +426,7 @@ export const importExport = async (
   const termIds = new Map<string, DocId>()
   const termKey = (taxonomy: string, slug: string) => `${taxonomy}:${slug}`
   const importTerms = async (phase: 'categories' | 'tags', taxonomy: 'category' | 'post_tag') => {
-    const slug = phaseCollection[phase]
+    const slug = phaseCollection.get(phase) as string
     const schema = schemaOf(slug)
     if (!schema?.has(f.wpId)) return
     const terms = index.terms.filter((t) => t.taxonomy === taxonomy)
@@ -441,7 +445,7 @@ export const importExport = async (
       }
       return
     }
-    log(`${phase === 'categories' ? 'Categories' : 'Tags'}: ${terms.length}`)
+    log(`${phaseLabel(phase)}: ${terms.length}`)
     let done = 0
     for (const term of taxonomy === 'category' ? sortByParent(terms) : terms) {
       done++
@@ -491,9 +495,11 @@ export const importExport = async (
     }
   }
 
-  // Posts and pages --------------------------------------------------------------------------
+  // Posts, pages and other post types -------------------------------------------------------
+  const typeOf = new Map(types.map((t) => [t.wpType, t]))
   const docIds = new Map<number, { collection: string; id: DocId }>()
-  const pageStatus = new Map<number, string>()
+  /** Status written for each hierarchical document, kept when its parent is set afterwards. */
+  const statusOf = new Map<number, string>()
   const editors = new Map<string, { config: SanitizedEditorConfig; info: EditorInfo }>()
   const editorFor = (schema: CollectionSchema) => {
     if (editors.has(schema.slug)) return editors.get(schema.slug)
@@ -505,26 +511,28 @@ export const importExport = async (
     return entry
   }
 
-  // Duplicate post slugs (possible for drafts) get the WordPress ID appended.
-  const postSlugs = new Map<number, string>()
+  // Duplicate slugs within a non-hierarchical type (possible for drafts) get the WordPress ID
+  // appended.
+  const uniqueSlugs = new Map<number, string>()
   {
     const seen = new Map<string, number>()
     for (const post of index.posts.values()) {
-      if (post.type !== 'post' || !IMPORTED_STATUSES.has(post.status)) continue
-      const other = seen.get(post.slug)
+      const type = typeOf.get(post.type)
+      if (!type || type.hierarchical || !IMPORTED_STATUSES.has(post.status)) continue
+      const key = `${post.type}:${post.slug}`
+      const other = seen.get(key)
       if (other === undefined) {
-        seen.set(post.slug, post.id)
-        postSlugs.set(post.id, post.slug)
-      } else {
-        postSlugs.set(post.id, `${post.slug}-${post.id}`)
-        warnings
-          .for({ wpId: post.id, wpType: 'post' })
-          .add(
-            'SLUG_CHANGED',
-            `Slug "${post.slug}" is also used by post ${other}; this post got "${post.slug}-${post.id}".`,
-            post.slug,
-          )
+        seen.set(key, post.id)
+        continue
       }
+      uniqueSlugs.set(post.id, `${post.slug}-${post.id}`)
+      warnings
+        .for({ wpId: post.id, wpType: post.type })
+        .add(
+          'SLUG_CHANGED',
+          `Slug "${post.slug}" is also used by ${post.type} ${other}; this ${post.type} got "${post.slug}-${post.id}".`,
+          post.slug,
+        )
     }
   }
 
@@ -549,7 +557,7 @@ export const importExport = async (
     }
     const data: Record<string, unknown> = {
       [f.title]: decodeEntities(item.title) || `Untitled ${item.type} ${item.id}`,
-      [f.slug]: item.type === 'post' ? postSlugs.get(item.id) : index.posts.get(item.id)?.slug,
+      [f.slug]: uniqueSlugs.get(item.id) ?? index.posts.get(item.id)?.slug,
       [f.excerpt]: plainText(item.excerpt) || undefined,
       [f.publishedAt]: toIso(item.postDateGmt) ?? toIso(item.postDate),
       [f.wpId]: item.id,
@@ -629,91 +637,93 @@ export const importExport = async (
     return { data, draft: !published }
   }
 
-  const documentPhases = (['posts', 'pages'] as const).filter((p) => selected.has(p))
-  for (const phase of ['posts', 'pages'] as const) {
-    if (selected.has(phase)) continue
-    const schema = schemaOf(phaseCollection[phase])
+  const selectedTypes = types.filter((t) => selected.has(t.phase))
+  for (const type of types) {
+    if (selected.has(type.phase)) continue
+    const schema = schemaOf(type.collection)
     if (!schema?.has(f.wpId)) continue
-    for (const [wpId, id] of await loadExisting(schema.slug))
+    for (const [wpId, id] of await loadExisting(schema.slug)) {
       docIds.set(wpId, { collection: schema.slug, id })
+    }
   }
-  if (documentPhases.length > 0) {
-    const totals = { posts: 0, pages: 0 }
+  if (selectedTypes.length > 0) {
+    const totals = new Map<string, number>()
     for (const post of index.posts.values()) {
-      if (!IMPORTED_STATUSES.has(post.status)) continue
-      if (post.type === 'post') totals.posts++
-      if (post.type === 'page') totals.pages++
+      if (!IMPORTED_STATUSES.has(post.status) || !typeOf.has(post.type)) continue
+      totals.set(post.type, (totals.get(post.type) ?? 0) + 1)
     }
-    for (const phase of documentPhases) {
-      const total =
-        options.limit === undefined ? totals[phase] : Math.min(totals[phase], options.limit)
-      log(`${phase === 'posts' ? 'Posts' : 'Pages'}: ${total}`)
+    const totalOf = (type: DocumentType) => {
+      const total = totals.get(type.wpType) ?? 0
+      return options.limit === undefined ? total : Math.min(total, options.limit)
     }
-    const written = { posts: 0, pages: 0 }
+    for (const type of selectedTypes) log(`${phaseLabel(type.phase)}: ${totalOf(type)}`)
+
+    const written = new Map<string, number>()
     for await (const record of readWxr(options.file)) {
       if (record.kind !== 'item') continue
       const { item } = record
-      const phase = item.type === 'post' ? 'posts' : item.type === 'page' ? 'pages' : undefined
-      if (!phase || !selected.has(phase) || !IMPORTED_STATUSES.has(item.status)) continue
-      if (options.limit !== undefined && written[phase] >= options.limit) continue
-      const schema = schemaOf(phaseCollection[phase]) as CollectionSchema
-      written[phase]++
+      const type = typeOf.get(item.type)
+      if (!type || !selected.has(type.phase) || !IMPORTED_STATUSES.has(item.status)) continue
+      const count = written.get(type.wpType) ?? 0
+      if (options.limit !== undefined && count >= options.limit) continue
+      written.set(type.wpType, count + 1)
+      const schema = schemaOf(type.collection) as CollectionSchema
       let built: ReturnType<typeof buildDocument>
       try {
         built = buildDocument(item, schema)
       } catch (error) {
-        result.phases[phase].failed++
+        ;(result.phases[type.phase] ??= emptyPhase()).failed++
         result.errors.push({
-          phase,
+          phase: type.phase,
           wpId: item.id,
           message: `conversion failed: ${errorMessage(error)}`,
         })
         continue
       }
-      const id = await upsert(phase, schema, item.id, built.data, { draft: built.draft })
+      const id = await upsert(type.phase, schema, item.id, built.data, { draft: built.draft })
       if (id !== undefined) docIds.set(item.id, { collection: schema.slug, id })
-      if (phase === 'pages') pageStatus.set(item.id, String(built.data._status))
-      const total =
-        options.limit === undefined ? totals[phase] : Math.min(totals[phase], options.limit)
-      progress(phase, written[phase], total)
+      if (type.hierarchical) statusOf.set(item.id, String(built.data._status))
+      progress(type.phase, count + 1, totalOf(type))
     }
 
-    // Parent pages, now that every page has an ID.
-    const pages = schemaOf(slugs.pages)
-    if (selected.has('pages') && pages?.relatesTo(f.parent, slugs.pages) && !options.dryRun) {
-      for (const [wpId, status] of pageStatus) {
-        const page = index.posts.get(wpId)
+    // Parents of hierarchical documents, now that every document has an ID.
+    if (!options.dryRun) {
+      for (const [wpId, status] of statusOf) {
+        const post = index.posts.get(wpId)
+        const type = post ? typeOf.get(post.type) : undefined
         const own = docIds.get(wpId)
-        const parent = page && page.parentId > 0 ? docIds.get(page.parentId) : undefined
-        if (!own || !page || page.parentId === 0) continue
+        if (!post || !type || !own || post.parentId === 0) continue
+        const schema = schemaOf(type.collection) as CollectionSchema
+        if (!schema.relatesTo(f.parent, type.collection)) continue
+        const parent = docIds.get(post.parentId)
         if (!parent) {
           warnings
-            .for({ wpId, wpType: 'page' })
+            .for({ wpId, wpType: post.type })
             .add(
               'REFERENCE_MISSING',
-              `Parent page ${page.parentId} was not imported; the page has no parent.`,
-              String(page.parentId),
+              `Parent ${post.type} ${post.parentId} was not imported; the ${post.type} has no parent.`,
+              String(post.parentId),
             )
           continue
         }
         try {
           await payload.update({
-            collection: slugs.pages,
+            collection: type.collection,
             id: own.id,
             data: {
-              [f.parent]: pages.relationValue(f.parent, slugs.pages, [parent.id]),
-              ...(pages.hasDrafts ? { _status: status } : {}),
+              [f.parent]: schema.relationValue(f.parent, type.collection, [parent.id]),
+              ...(schema.hasDrafts ? { _status: status } : {}),
             },
             depth: 0,
             overrideAccess: true,
             context: WRITE_CONTEXT,
-            ...(pages.hasDrafts ? { draft: status === 'draft' } : {}),
+            ...(schema.hasDrafts ? { draft: status === 'draft' } : {}),
           })
         } catch (error) {
           result.errors.push({
-            phase: 'pages',
+            phase: type.phase,
             wpId,
-            message: `setting the parent page failed: ${errorMessage(error)}`,
+            message: `setting the parent failed: ${errorMessage(error)}`,
           })
         }
       }
@@ -743,7 +753,7 @@ export const importExport = async (
           ? [reference.relationTo]
           : [],
     )
-    const stats = result.phases.redirects
+    const stats = (result.phases.redirects ??= emptyPhase())
     let done = 0
     for (const r of map.redirects) {
       done++

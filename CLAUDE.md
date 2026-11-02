@@ -42,6 +42,20 @@ Settled with the maintainer; change them only after asking.
 - Settings live in `wp-to-payload.config.json` (JSON, no loader); command-line flags override it.
 - Comments are counted in reports, not imported.
 - Author e-mail addresses are imported only when `importAuthorEmails` is set.
+- ACF fields go to the top level of a collection (`post.price`). When a name clashes with an
+  existing field, the ACF field is renamed and a warning with a code is reported.
+- The default language has no URL prefix (`/ueber-uns`, `/en/about-us`); the config can
+  change that.
+- WPML support is tested only against its documented export keys and is marked experimental.
+- Fixtures with plugin data are exports of real WordPress sites built by `scripts/fixtures`
+  (Docker): only our synthetic content goes into the repository, never plugin code.
+- Version 0.2 is delivered stage by stage, one pull request per stage.
+
+## Pull requests
+
+- One pull request per stage or topic, into `main`, merged once CI is green.
+- The description says what changed and how it was tested. No "Generated with Claude Code"
+  line and no links to an assistant session.
 
 ## Commits
 

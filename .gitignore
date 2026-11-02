@@ -17,3 +17,4 @@ wp-content/
 
 # Integration test project: installed dependencies and run output
 test/payload-project/.runs/
+scripts/fixtures/out/

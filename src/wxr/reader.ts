@@ -84,7 +84,11 @@ const buildAuthor = (f: Fields): WxrAuthor | undefined => {
   return author
 }
 
-const buildTerm = (element: string, f: Fields): WxrTerm | undefined => {
+const buildTerm = (
+  element: string,
+  f: Fields,
+  meta: Map<string, string[]>,
+): WxrTerm | undefined => {
   let taxonomy: string
   let slug: string | undefined
   let name: string | undefined
@@ -110,7 +114,12 @@ const buildTerm = (element: string, f: Fields): WxrTerm | undefined => {
   }
   if (!slug) return undefined
   // WordPress stores term names HTML-escaped (`Recipes &amp; Baking`).
-  const term: WxrTerm = { taxonomy, slug, name: decodeEntities(name?.trim() ?? '') || slug }
+  const term: WxrTerm = {
+    taxonomy,
+    slug,
+    name: decodeEntities(name?.trim() ?? '') || slug,
+    meta,
+  }
   const id = optionalInt(f.get('wp:term_id'))
   if (id !== undefined) term.id = id
   if (parentSlug) term.parentSlug = parentSlug
@@ -226,9 +235,26 @@ export async function* readWxr(
 
   let site: WxrSite | undefined = emptySite()
   let fields: Fields | undefined
+  let termMeta: Map<string, string[]> = new Map()
   let item: WxrItem | undefined
   let metaKey: string | undefined
   let metaValue: string | undefined
+
+  /** `wp:meta_key` and `wp:meta_value` of a postmeta or termmeta element. */
+  const readMeta = (name: string, text: string) => {
+    if (name === 'wp:meta_key') metaKey = text.trim()
+    else if (name === 'wp:meta_value') metaValue = text
+  }
+  /** Stores the pair read by `readMeta`. A key can have several values. */
+  const addMeta = (meta: Map<string, string[]>) => {
+    if (metaKey !== undefined) {
+      const values = meta.get(metaKey)
+      if (values) values.push(metaValue ?? '')
+      else meta.set(metaKey, [metaValue ?? ''])
+    }
+    metaKey = undefined
+    metaValue = undefined
+  }
   let commentDepth = 0
 
   const flushSite = () => {
@@ -264,6 +290,7 @@ export async function* readWxr(
         item = newItem()
       } else if (name === 'wp:author' || TERM_ELEMENTS.has(name)) {
         fields = new Map()
+        termMeta = new Map()
       }
     }
   }
@@ -297,7 +324,7 @@ export async function* readWxr(
         if (author) queue.push({ kind: 'author', author })
         fields = undefined
       } else if (TERM_ELEMENTS.has(name) && fields) {
-        const term = buildTerm(name, fields)
+        const term = buildTerm(name, fields, termMeta)
         if (term) queue.push({ kind: 'term', term })
         fields = undefined
       } else if (site && name in SITE_FIELDS) {
@@ -310,6 +337,14 @@ export async function* readWxr(
       return
     }
 
+    if (fields && TERM_ELEMENTS.has(parent ?? '') && name === 'wp:termmeta') {
+      addMeta(termMeta)
+      return
+    }
+    if (fields && parent === 'wp:termmeta') {
+      readMeta(name, text)
+      return
+    }
     if (fields && (parent === 'wp:author' || TERM_ELEMENTS.has(parent ?? ''))) {
       fields.set(name, text)
       return
@@ -324,19 +359,12 @@ export async function* readWxr(
             item.terms.push({ taxonomy, slug, name: decodeEntities(text.trim()) || slug })
           }
         } else if (name === 'wp:postmeta') {
-          if (metaKey !== undefined) {
-            const values = item.meta.get(metaKey)
-            if (values) values.push(metaValue ?? '')
-            else item.meta.set(metaKey, [metaValue ?? ''])
-          }
-          metaKey = undefined
-          metaValue = undefined
+          addMeta(item.meta)
         } else {
           applyItemField(item, name, text)
         }
       } else if (parent === 'wp:postmeta') {
-        if (name === 'wp:meta_key') metaKey = text.trim()
-        else if (name === 'wp:meta_value') metaValue = text
+        readMeta(name, text)
       }
     }
   }

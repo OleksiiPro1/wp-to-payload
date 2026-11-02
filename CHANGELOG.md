@@ -4,6 +4,19 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+
+- Term meta (`wp:termmeta`) is read from exports, and a reader for PHP `serialize()` data
+  handles plugin data such as Polylang translations and ACF settings. Groundwork for 0.2.
+
+### Development
+
+- Test fixtures from real WordPress 7.1 sites, built in Docker by `scripts/fixtures` and
+  exported with both WordPress's exporter and WP-CLI.
+- Tests of the Payload features the import relies on (hasMany numbers, localized fields).
+
 ## [0.1.0] - Unreleased
 
 First release.
