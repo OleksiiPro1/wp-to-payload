@@ -32,6 +32,8 @@ of Wien Webstudio, so quality and honesty about limits matter more than features
   does. Change both together.
 - Which post types and taxonomies are imported, their collections and default URLs are decided
   in `src/site-types.ts` alone; `analyze`, `scaffold`, `import` and `redirects` all use it.
+- Which ACF fields a collection gets, and their Payload names and types, are decided in
+  `src/acf/plan.ts` alone; `analyze`, `scaffold` and `import` all use it.
 - Work on a branch, small logical commits with conventional messages. `main` only changes
   through pull requests; never push to it directly.
 - Releases: bump the version in a pull request, then push a `v*` tag on `main`;
