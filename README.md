@@ -20,27 +20,54 @@ export file. No access to the old site is needed: no plugin, no API keys, no dat
 
 ## Quick start
 
-Export your site in WordPress under **Tools → Export → All content**. Then, in the root of
-your Payload 3 project:
+Export your site in WordPress under **Tools → Export → All content**. Copy its
+`wp-content/uploads` folder too if you can; otherwise media files are downloaded from the site.
+
+Start a Payload project, or use an existing one (see below):
+
+```bash
+npx create-payload-app -n my-site -t blank
+```
+
+```bash
+cd my-site
+```
+
+The blank template has a `media` collection of its own. Delete `src/collections/Media.ts` and
+remove `Media` from `collections` in `src/payload.config.ts`: scaffold writes one with the field
+the import needs. Then look at what the site contains:
 
 ```bash
 npx wp-to-payload analyze export.xml
 ```
 
+Write the collections (and globals for the menus):
+
 ```bash
 npx wp-to-payload scaffold export.xml
 ```
 
-Add the printed lines to `payload.config.ts` (the collections and the SEO and redirects
-plugins), then:
+Add the lines it prints to `src/payload.config.ts`: the collections, the globals, the SEO and
+redirects plugins, and `localization` for a site in several languages. Install the two plugins
+it names. Then import, first as a dry run:
+
+```bash
+npx wp-to-payload import export.xml --uploads-dir ./uploads --dry-run
+```
 
 ```bash
 npx wp-to-payload import export.xml --uploads-dir ./uploads
 ```
 
-`--uploads-dir` points to a copy of the old site's `wp-content/uploads`. Without it, media
-files are downloaded from the site. Start with `--dry-run` to see what would change without
-writing anything.
+`--uploads-dir` points to the copy of `wp-content/uploads`. The import writes a report of
+everything it could not move as it was to `wp-to-payload-report/`; run it again whenever you
+like, it updates what it imported before.
+
+**An existing project**, such as one started from Payload's website template, may have
+collections with the same slugs (`posts`, `pages`, `categories`, `media`). Scaffold then stops
+and explains the choices: `--slug-prefix wp-` for collections of their own, or mapping your
+collections in `wp-to-payload.config.json` (see [Configuration file](#configuration-file)). The
+template's `header` and `footer` globals get the menus as they are.
 
 ## Requirements
 
