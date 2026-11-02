@@ -122,6 +122,41 @@ export interface AnalyzeReport {
   multilingual: Record<'wpml' | 'polylang', Detection>
   woocommerce: Detection
   acf: Detection
+  /** ACF field groups and what the import does with their fields; only when ACF is found. */
+  customFields?: CustomFieldsReport
   complexity: { level: Complexity; score: number; reasons: ComplexityReason[] }
   issues: { line: number; column: number; message: string }[]
+}
+
+/** ACF field groups (from the export and from `--acf-json`) and how they are imported. */
+export interface CustomFieldsReport {
+  groups: {
+    key: string
+    title: string
+    source: 'export' | 'json'
+    /** Fields, sub-fields included. */
+    fields: number
+    /** Collections that get its fields. */
+    collections: string[]
+    /** Where else it applies in WordPress (options pages, users, …), for groups without a collection. */
+    elsewhere: string[]
+  }[]
+  /** Fields by ACF type, sub-fields included. */
+  fieldTypes: Record<string, number>
+  /** Payload field names per collection. */
+  collections: { collection: string; fields: string[] }[]
+  /** Fields that are not imported, or imported under another name. */
+  notes: {
+    code: 'ACF_FIELD_SKIPPED' | 'ACF_FIELD_RENAMED'
+    collection: string
+    field: string
+    type: string
+    message: string
+    /** Items that have a value (top-level fields only). */
+    values?: number
+  }[]
+  /** Values of fields that no field group defines: their groups exist only in the theme's code. */
+  undefinedValues: { target: string; name: string; key: string; items: number }[]
+  /** Date and time fields, whose values have no time zone. */
+  dateTimeFields: number
 }

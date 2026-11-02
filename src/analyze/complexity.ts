@@ -63,7 +63,25 @@ export const scoreComplexity = (
       )
     }
   }
-  if (report.acf.detected) add(2, 'Advanced Custom Fields (custom fields are not migrated in 0.1)')
+  const fields = report.customFields
+  if (fields) {
+    const imported = fields.collections.reduce((n, c) => n + c.fields.length, 0)
+    if (imported > 0) {
+      add(1, `${imported} ACF fields become Payload fields (check them after scaffold)`)
+    }
+    const lost = fields.notes.filter((n) => n.code === 'ACF_FIELD_SKIPPED' && (n.values ?? 0) > 0)
+    if (lost.length > 0) {
+      add(1, `ACF fields with values that are not imported: ${lost.map((n) => n.field).join(', ')}`)
+    }
+    if (fields.undefinedValues.length > 0) {
+      add(
+        2,
+        `values of ${fields.undefinedValues.length} ACF fields without a definition in the export (pass the theme's acf-json with --acf-json)`,
+      )
+    }
+  } else if (report.acf.detected) {
+    add(1, 'Advanced Custom Fields')
+  }
 
   const customTypes = Object.keys(report.counts.customPostTypes)
   if (customTypes.length > 0) {

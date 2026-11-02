@@ -1,4 +1,4 @@
-import type { AnalyzeReport, Detection } from './report.js'
+import type { AnalyzeReport, CustomFieldsReport, Detection } from './report.js'
 
 const SUPPORT_LABEL = {
   supported: '✅ converted',
@@ -32,6 +32,52 @@ const detectionRow = (name: string, d: Detection, note: string): (string | numbe
   d.detected ? d.items : '–',
   d.detected ? note : '',
 ]
+
+const pushCustomFields = (c: CustomFieldsReport, push: (...l: string[]) => void) => {
+  push('## Custom fields (ACF)', '')
+  if (c.groups.length === 0) {
+    push('Items have ACF values, but the export defines no field groups.', '')
+  } else {
+    push(
+      ...tableOf(
+        ['Field group', 'Fields', 'From', 'Collections'],
+        c.groups.map((g) => [
+          `${g.title} (${g.key})`,
+          g.fields,
+          g.source === 'json' ? 'ACF JSON' : 'export',
+          g.collections.join(', ') ||
+            (g.elsewhere.length > 0 ? `none: ${g.elsewhere.join(', ')}` : 'none'),
+        ]),
+      ),
+      '',
+    )
+    const types = Object.entries(c.fieldTypes).sort(
+      (a, b) => b[1] - a[1] || a[0].localeCompare(b[0]),
+    )
+    push(`Field types: ${types.map(([t, n]) => `${t} (${n})`).join(', ')}.`, '')
+  }
+  for (const collection of c.collections) {
+    push(`- \`${collection.collection}\`: ${collection.fields.join(', ')}`)
+  }
+  if (c.collections.length > 0) push('')
+  if (c.notes.length > 0) {
+    push('Not imported as they are:', '')
+    for (const note of c.notes) push(`- ${note.message}`)
+    push('')
+  }
+  if (c.undefinedValues.length > 0) {
+    push(
+      `Items have values of ${c.undefinedValues.length} fields that no field group in the export defines: ${c.undefinedValues.map((v) => `\`${v.name}\``).join(', ')}. Their groups are probably registered in the theme (local JSON or PHP); pass them with \`--acf-json\`.`,
+      '',
+    )
+  }
+  if (c.dateTimeFields > 0) {
+    push(
+      'Dates with times have no time zone in WordPress. Set `timeZone` in wp-to-payload.config.json for exact values; otherwise the offset of most items is used.',
+      '',
+    )
+  }
+}
 
 /** Renders the analysis report as Markdown for people (report.json holds the same data). */
 export const renderMarkdown = (r: AnalyzeReport): string => {
@@ -228,7 +274,7 @@ export const renderMarkdown = (r: AnalyzeReport): string => {
         ),
         detectionRow('Polylang', r.multilingual.polylang, 'translations → Payload locales'),
         detectionRow('WooCommerce', r.woocommerce, 'detected only'),
-        detectionRow('Advanced Custom Fields', r.acf, 'detected only'),
+        detectionRow('Advanced Custom Fields', r.acf, 'fields → Payload fields'),
       ],
     ),
     '',
@@ -236,8 +282,7 @@ export const renderMarkdown = (r: AnalyzeReport): string => {
   const languages = r.multilingual.polylang.details?.languages
   if (Array.isArray(languages) && languages.length > 0)
     push(`Polylang languages: ${languages.join(', ')}.`, '')
-  if (r.acf.details)
-    push(`ACF: ${r.acf.details.fieldGroups} field groups, ${r.acf.details.fields} fields.`, '')
+  if (r.customFields) pushCustomFields(r.customFields, push)
 
   push('## Media', '')
   const media = Object.entries(r.media.byType).sort((a, b) => b[1] - a[1])
