@@ -33,6 +33,21 @@ export interface TermArchive {
   nested?: boolean
 }
 
+/**
+ * Language directories of a multilingual site. New paths get the item's directory through the
+ * `:locale` token, or in front when the pattern has none; the default language gets none.
+ */
+export interface UrlLanguages {
+  /** New directory of an item (`en`), or empty. */
+  itemPrefix(postId: number): string
+  /** New directory of a term. */
+  termPrefix(taxonomy: string, slug: string): string
+  /** Directory of a term archive in the old URLs (`/en`), or empty. */
+  oldTermPrefix(taxonomy: string, slug: string): string
+  /** Language directories of the old URLs (`en`), removed before term archives are matched. */
+  oldDirectories: string[]
+}
+
 export interface SiteUrlsOptions {
   patterns?: PathPatterns
   /** More hostnames that count as the old site (for example a staging domain). */
@@ -42,7 +57,12 @@ export interface SiteUrlsOptions {
    * `patterns.category` and `patterns.tag`.
    */
   archives?: TermArchive[]
+  languages?: UrlLanguages
 }
+
+/** A pattern with the language directory: in place of `:locale`, or in front. */
+const withLocale = (pattern: string): string =>
+  pattern.includes(':locale') ? pattern : `/:locale${pattern}`
 
 /** Old and new URLs of everything in an export. */
 export class SiteUrls {
@@ -56,12 +76,14 @@ export class SiteUrls {
   /** Terms by taxonomy and slug, for paths with parent terms. */
   private readonly terms = new Map<string, Map<string, WxrTerm>>()
   private readonly newPaths = new Map<number, string | undefined>()
+  private readonly languages: UrlLanguages | undefined
 
   constructor(
     private readonly index: SiteIndex,
     options: SiteUrlsOptions = {},
   ) {
     this.patterns = { ...DEFAULT_PATTERNS, ...options.patterns }
+    this.languages = options.languages
     const builtin: TermArchive[] = []
     if (this.patterns.category) {
       builtin.push({
@@ -125,7 +147,14 @@ export class SiteUrls {
     if (this.newPaths.has(postId)) return this.newPaths.get(postId)
     const post = this.index.posts.get(postId)
     const pattern = post ? this.patterns[post.type] : undefined
-    const path = post && pattern ? fillPattern(pattern, this.tokens(post)) : undefined
+    let path: string | undefined
+    if (post && pattern) {
+      const locale = this.languages?.itemPrefix(post.id)
+      path = fillPattern(locale === undefined ? pattern : withLocale(pattern), {
+        ...this.tokens(post),
+        locale: locale ?? '',
+      })
+    }
     this.newPaths.set(postId, path)
     return path
   }
@@ -134,7 +163,17 @@ export class SiteUrls {
   termPath(taxonomy: string, slug: string): string | undefined {
     const archive = this.archives.find((a) => a.taxonomy === taxonomy)
     if (!archive) return undefined
-    return fillPattern(archive.pattern, { slug, path: this.termTree(taxonomy, slug) })
+    const locale = this.languages?.termPrefix(taxonomy, slug)
+    return fillPattern(locale === undefined ? archive.pattern : withLocale(archive.pattern), {
+      slug,
+      path: this.termTree(taxonomy, slug),
+      locale: locale ?? '',
+    })
+  }
+
+  /** The language directory of a term archive in the old URLs (`/en`), or empty. */
+  oldTermPrefix(taxonomy: string, slug: string): string {
+    return this.languages?.oldTermPrefix(taxonomy, slug) ?? ''
   }
 
   /** The term's slug after the slugs of its parents, joined with `/` (`rezepte/brot`). */
@@ -171,7 +210,9 @@ export class SiteUrls {
     const postId = this.findPost(href)
     let path = postId === undefined ? undefined : this.newPath(postId)
     if (path === undefined) {
-      const rel = decodeSafe(url.pathname.slice(this.sitePath.length)).replace(/\/+$/, '')
+      let rel = decodeSafe(url.pathname.slice(this.sitePath.length)).replace(/\/+$/, '')
+      const directory = this.languages?.oldDirectories.find((d) => rel.startsWith(`/${d}/`))
+      if (directory) rel = rel.slice(directory.length + 1)
       const archive = this.archives.find((a) => rel.startsWith(`/${a.base}/`))
       const slug = archive
         ? rel

@@ -2,6 +2,8 @@ import { fileURLToPath } from 'node:url'
 import { beforeAll, describe, expect, it } from 'vitest'
 import { DEFAULT_CONFIG, parseConfig } from '../../src/config.js'
 import { indexLanguages, type SiteLanguages, translationsOf } from '../../src/languages.js'
+import { buildRedirects } from '../../src/redirects/build.js'
+import { describeSite } from '../../src/site.js'
 import { buildSiteIndex, type SiteIndex } from '../../src/wxr/site-index.js'
 import { fromString, wxr } from '../helpers.js'
 
@@ -125,5 +127,47 @@ describe('WPML', () => {
   it('is not multilingual without any of this', async () => {
     const index = await buildSiteIndex(fromString(wxr(item(1, '/a/'))))
     expect(indexLanguages(index, DEFAULT_CONFIG)).toBeUndefined()
+  })
+})
+
+describe('URLs of a multilingual site', () => {
+  let index: SiteIndex
+  beforeAll(async () => {
+    index = await buildSiteIndex(multilingual)
+  })
+  const urlsFor = (raw: unknown) => describeSite(index, parseConfig(raw)).urls
+
+  it('puts the language directory in front of new paths, except for the default language', () => {
+    const urls = urlsFor({ paths: { page: '/:path' } })
+    expect(urls.newPath(3)).toBe('/ueber-uns')
+    expect(urls.newPath(4)).toBe('/en/about-us')
+    expect(urls.newPath(6)).toBe('/en/about-us/our-team')
+    expect(urls.rewriteHref('https://multilingual.example.com/en/about-us/')).toBe('/en/about-us')
+    const prefixed = urlsFor({
+      paths: { page: '/:locale/seiten/:slug' },
+      localization: { prefixDefaultLanguage: true, locales: { en: 'en-gb' } },
+    })
+    expect(prefixed.newPath(3)).toBe('/de/seiten/ueber-uns')
+    expect(prefixed.newPath(4)).toBe('/en-gb/seiten/about-us')
+  })
+
+  it('redirects every language version, earlier slugs and term archives', () => {
+    const urls = urlsFor({
+      paths: { post: '/blog/:slug', page: '/:path', category: '/blog/category/:path' },
+    })
+    const { redirects, warnings } = buildRedirects(index, urls)
+    expect(warnings).toEqual([])
+    const map = Object.fromEntries(redirects.map((r) => [r.from, r.to]))
+    expect(map).toMatchObject({
+      '/2024/02/01/neue-werkbank/': '/blog/neue-werkbank',
+      '/en/2024/02/01/new-workbench/': '/en/blog/new-workbench',
+      '/en/2024/02/01/new-bench/': '/en/blog/new-workbench',
+      '/category/produkte/moebel/': '/blog/category/produkte/moebel',
+      '/en/category/products/furniture/': '/en/blog/category/products/furniture',
+    })
+    // Attachment pages get no redirect, as before.
+    expect(map['/en/werkstatt-2/']).toBeUndefined()
+    expect(map['/ueber-uns/']).toBeUndefined()
+    expect(map['/en/about-us/our-team/']).toBeUndefined()
   })
 })

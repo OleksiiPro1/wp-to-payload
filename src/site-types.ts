@@ -1,6 +1,6 @@
 import type { Config } from './config.js'
 import type { PathPatterns } from './paths/patterns.js'
-import type { SiteUrlsOptions, TermArchive } from './paths/site-urls.js'
+import type { SiteUrlsOptions, TermArchive, UrlLanguages } from './paths/site-urls.js'
 import type { WxrItemTerm, WxrTerm } from './wxr/model.js'
 import { INTERNAL_TYPES, type SiteIndex } from './wxr/site-index.js'
 
@@ -458,8 +458,13 @@ export const resolveSiteTypes = (config: Config, survey: TypeSurvey): SiteTypes 
 }
 
 /** Options for `SiteUrls` that match the resolved types, so links and redirects agree. */
-export const siteUrlsOptions = (config: Config, types: SiteTypes): SiteUrlsOptions => ({
+export const siteUrlsOptions = (
+  config: Config,
+  types: SiteTypes,
+  languages?: UrlLanguages,
+): SiteUrlsOptions => ({
   patterns: types.patterns,
   extraHosts: config.siteHosts,
   archives: types.archives,
+  ...(languages ? { languages } : {}),
 })

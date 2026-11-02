@@ -1,4 +1,5 @@
 import type { Config } from './config.js'
+import type { UrlLanguages } from './paths/site-urls.js'
 import { maybeUnserializePhp, phpEntries } from './util/php-serialize.js'
 import type { WxrItemTerm, WxrTerm } from './wxr/model.js'
 import type { SiteIndex } from './wxr/site-index.js'
@@ -308,4 +309,30 @@ export const termTranslationsOf = (
 export const newPrefixOf = (languages: SiteLanguages, config: Config, code: string): string => {
   if (code === languages.defaultLanguage && !config.localization.prefixDefaultLanguage) return ''
   return config.localization.locales[code] ?? code
+}
+
+/** The language directories of items and terms, old and new, for `SiteUrls`. */
+export const urlLanguages = (
+  languages: SiteLanguages,
+  config: Config,
+  index: Pick<SiteIndex, 'terms'>,
+): UrlLanguages => {
+  const termIds = new Map<string, number>()
+  for (const term of index.terms) {
+    if (term.id !== undefined) termIds.set(`${term.taxonomy}:${term.slug}`, term.id)
+  }
+  const termLanguage = (taxonomy: string, slug: string): string => {
+    const id = termIds.get(`${taxonomy}:${slug}`)
+    return (
+      (id === undefined ? undefined : languages.termLanguage.get(id)) ?? languages.defaultLanguage
+    )
+  }
+  return {
+    itemPrefix: (id) =>
+      newPrefixOf(languages, config, languages.itemLanguage.get(id) ?? languages.defaultLanguage),
+    termPrefix: (taxonomy, slug) => newPrefixOf(languages, config, termLanguage(taxonomy, slug)),
+    oldTermPrefix: (taxonomy, slug) =>
+      languages.oldPrefixes.get(termLanguage(taxonomy, slug)) ?? '',
+    oldDirectories: [...languages.oldPrefixes.values()].filter(Boolean).map((p) => p.slice(1)),
+  }
 }

@@ -10,10 +10,9 @@ import {
 } from '../cli/command.js'
 import { out, success, warn } from '../cli/output.js'
 import { configFromOptions, PATH_HELP, PATH_OPTIONS } from '../cli/shared.js'
-import { SiteUrls } from '../paths/site-urls.js'
 import { buildRedirects } from '../redirects/build.js'
 import { FILE_NAMES, FORMATS, formatRedirects, type RedirectFormat } from '../redirects/formats.js'
-import { resolveSiteTypes, siteUrlsOptions, surveyIndex } from '../site-types.js'
+import { describeSite } from '../site.js'
 import { buildSiteIndex } from '../wxr/site-index.js'
 
 export const redirectsCommand: Command = {
@@ -59,9 +58,7 @@ export const redirectsCommand: Command = {
       }
     }
     const config = await configFromOptions(ctx)
-    const index = await buildSiteIndex(file)
-    const types = resolveSiteTypes(config, surveyIndex(index))
-    const urls = new SiteUrls(index, siteUrlsOptions(config, types))
+    const { index, urls } = describeSite(await buildSiteIndex(file), config)
     const { redirects, warnings } = buildRedirects(index, urls)
     for (const w of warnings) warn(w.message)
 
