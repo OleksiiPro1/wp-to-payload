@@ -4,6 +4,7 @@ import { AcfCollector } from '../acf/collect.js'
 import { type AcfField, type AcfFieldGroup, loadAcfJson } from '../acf/definitions.js'
 import { planSiteAcf } from '../acf/site.js'
 import { BUILDERS, type Builder, detectBuilders } from '../content/builders.js'
+import { contentSource } from '../content/elementor.js'
 import { BLOCK_OPENER, blockSupport, hasBlocks, normalizeBlockName } from '../content/blocks.js'
 import { scanShortcodes } from '../content/shortcodes-scan.js'
 import { DEFAULT_CONFIG } from '../config.js'
@@ -12,6 +13,7 @@ import { MenuCollector, menuLevels, placeMenus } from '../menus.js'
 import {
   BUILTIN_POST_TYPES,
   BUILTIN_TAXONOMIES,
+  PLUGIN_POST_TYPES,
   resolveSiteTypes,
   TypeSurveyor,
 } from '../site-types.js'
@@ -151,6 +153,10 @@ export const analyzeExport = async (
   const polylang = emptyDetection()
   const woo = emptyDetection()
   const wooTypes: Record<string, number> = {}
+  const elementorWidgets = new Map<string, number>()
+  const elementorUnknown = new Set<string>()
+  let elementorConverted = 0
+  let elementorInvalid = 0
   const acf = emptyDetection()
   let acfFieldGroups = 0
   let acfFields = 0
@@ -254,13 +260,27 @@ export const analyzeExport = async (
     }
 
     // Trashed and auto-saved items are counted by status but never migrated, so their content
-    // does not count.
-    if (SKIPPED_STATUSES.has(item.status)) continue
+    // does not count; neither does that of plugin types such as page builder templates.
+    if (SKIPPED_STATUSES.has(item.status) || PLUGIN_POST_TYPES[item.type]) continue
     languageItems.add(item.id)
     if (item.hasPassword) passwordProtected++
     scanContent(item)
 
-    for (const builder of detectBuilders(item)) builders[builder].items++
+    const itemBuilders = detectBuilders(item)
+    for (const builder of itemBuilders) builders[builder].items++
+    if (itemBuilders.includes('elementor')) {
+      // The same decision as the import: Elementor's widgets, or the stored HTML.
+      const source = contentSource(item)
+      if (source.elementor) {
+        elementorConverted++
+        for (const [type, n] of source.elementor.widgets) {
+          elementorWidgets.set(type, (elementorWidgets.get(type) ?? 0) + n)
+        }
+        for (const type of source.elementor.unknown) elementorUnknown.add(type)
+      } else if (source.warnings.some((w) => w.code === 'BUILDER_DATA_INVALID')) {
+        elementorInvalid++
+      }
+    }
     for (const plugin of detectSeo(item)) {
       seo[plugin].items++
       const titleKey = {
@@ -311,6 +331,16 @@ export const analyzeExport = async (
   }
 
   for (const key of BUILDERS) builders[key] = finish(builders[key])
+  if (elementorConverted > 0 || elementorInvalid > 0) {
+    builders.elementor.details = {
+      converted: elementorConverted,
+      invalidData: elementorInvalid,
+      widgets: Object.fromEntries(
+        [...elementorWidgets].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])),
+      ),
+      withoutConverter: [...elementorUnknown].sort(),
+    }
+  }
   for (const key of SEO_KEYS) {
     seo[key] = finish(seo[key])
     if (seo[key].detected) seo[key].details = { itemsWithTitle: seoWithTitle[key] }

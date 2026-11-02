@@ -35,6 +35,20 @@ export const scoreComplexity = (
 
   for (const [key, detection] of Object.entries(report.builders)) {
     if (!detection.detected) continue
+    const details = detection.details ?? {}
+    const converted = typeof details.converted === 'number' ? details.converted : 0
+    const invalid = typeof details.invalidData === 'number' ? details.invalidData : 0
+    const unknown = Array.isArray(details.withoutConverter) ? details.withoutConverter : []
+    if (key === 'elementor' && converted > 0 && converted >= detection.items - invalid) {
+      // Elementor's widgets are converted; its layout has to be rebuilt.
+      add(3, `Elementor on ${detection.items} items (widgets are converted, the layout is not)`)
+      if (unknown.length > 0) add(1, `Elementor widgets without a converter: ${unknown.join(', ')}`)
+      if (invalid > 0) {
+        forceComplex = true
+        add(2, `broken Elementor data on ${invalid} items (their stored HTML is used)`)
+      }
+      continue
+    }
     forceComplex = true
     add(
       3,

@@ -25,7 +25,7 @@ export interface Detection {
   detected: boolean
   /** Number of items (posts, pages and other entries) with this feature. */
   items: number
-  details?: Record<string, number | string | string[]>
+  details?: Record<string, number | string | string[] | Record<string, number>>
 }
 
 /** A custom post type and what the import does with it. */
