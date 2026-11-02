@@ -183,7 +183,9 @@ $imprint_de = ml_post(
 	)
 );
 
-// Posts. Links point to the page of the same language.
+// Posts. Links point to the page of the same language. Polylang adds the language directory to
+// permalinks only once its languages exist when WordPress starts, so in this script the English
+// URLs are written out.
 $bench_de = ml_post(
 	'de',
 	array(
@@ -215,7 +217,7 @@ $bench_en = ml_post(
 		'post_category' => array( $products_en, $furniture_en ),
 		'post_content'  => sprintf(
 			"<!-- wp:paragraph -->\n<p>Find out more <a href=\"%s\">about us</a>.</p>\n<!-- /wp:paragraph -->\n\n<!-- wp:image {\"id\":%d,\"sizeSlug\":\"large\"} -->\n<figure class=\"wp-block-image size-large\"><img src=\"%s\" alt=\"Our workshop\" class=\"wp-image-%d\"/></figure>\n<!-- /wp:image -->",
-			get_permalink( $about_en ),
+			home_url( '/en/' . get_page_uri( $about_en ) . '/' ),
 			$workshop_en,
 			wp_get_attachment_image_url( $workshop_en, 'large' ),
 			$workshop_en
