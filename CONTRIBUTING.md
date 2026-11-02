@@ -132,6 +132,9 @@ code, as themes do; it is not in the export, and the tests pass it with `--acf-j
   images that ACF attaches to a post) get fixed dates, so the exports stay comparable.
 - ACF values are saved by field key (`update_field('field_…', …)`), as the editor does; by name,
   ACF may take a field of another group with the same name.
+- Elementor saves documents only for a user who may edit them, and marks them as built with
+  Elementor only when asked (`set_is_built_with_elementor`); the `elementor` scenario does both.
+  Built from Git, Elementor reports its version as 4.0.0; the release build would set 4.0.8.
 
 ## Changes
 

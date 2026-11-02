@@ -3,7 +3,7 @@ import type { AcfPayloadField } from '../acf/plan.js'
 import { planSiteAcf } from '../acf/site.js'
 import { commonOffset, localToIso, type SiteTime } from '../acf/time.js'
 import { type AcfValueContext, acfValues } from '../acf/values.js'
-import { detectBuilders } from '../content/builders.js'
+import { contentSource } from '../content/elementor.js'
 import { MediaMatcher } from '../content/media-match.js'
 import { prepareContent } from '../content/pipeline.js'
 import type { ContentContext } from '../content/types.js'
@@ -1045,7 +1045,9 @@ export const importExport = async (
     }
 
     const editor = editorFor(schema)
+    const source = contentSource(item)
     if (editor) {
+      for (const w of source.warnings) itemWarnings.add(w.code, w.message, w.subject)
       const ctx: ContentContext = {
         postId: item.id,
         urls,
@@ -1055,18 +1057,18 @@ export const importExport = async (
         mediaUrl: (wpId) => mediaUrls.get(wpId),
         mediaCollection: slugs.media,
         capabilities: editor.info.capabilities,
-        builders: detectBuilders(item),
+        builders: source.builders,
         warnings: itemWarnings,
       }
       const state = htmlToLexical(
-        prepareContent(item.content, ctx),
+        prepareContent(source.content, ctx),
         lexical,
         editor.config,
         editor.info,
         mediaIdType,
       )
       if (!isEmptyState(state)) data[f.content] = state
-    } else if (item.content.trim()) {
+    } else if (source.content.trim()) {
       reportMissing(schema.slug, [f.content])
     }
 

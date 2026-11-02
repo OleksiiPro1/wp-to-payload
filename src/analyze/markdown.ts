@@ -119,7 +119,7 @@ export const renderMarkdown = (r: AnalyzeReport): string => {
     )
   }
   push(
-    'Score: 0–2 simple, 3–5 medium, 6 or more complex. Page builders, WooCommerce and multilingual content always count as complex.',
+    'Score: 0–2 simple, 3–5 medium, 6 or more complex. Page builders whose content cannot be converted (all but Elementor with intact data), WooCommerce, and multilingual content without linked translations always count as complex.',
     '',
   )
 
@@ -254,7 +254,13 @@ export const renderMarkdown = (r: AnalyzeReport): string => {
     ...tableOf(
       ['Feature', 'Found', 'Items', 'Import'],
       [
-        detectionRow('Elementor', r.builders.elementor, 'text kept, layout lost'),
+        detectionRow(
+          'Elementor',
+          r.builders.elementor,
+          r.builders.elementor.details?.converted
+            ? 'widgets converted, layout lost'
+            : 'text kept, layout lost',
+        ),
         detectionRow('Divi', r.builders.divi, 'text kept, layout lost'),
         detectionRow('WPBakery', r.builders.wpbakery, 'text kept, layout lost'),
         detectionRow('Beaver Builder', r.builders.beaver, 'text kept, layout lost'),
@@ -279,6 +285,16 @@ export const renderMarkdown = (r: AnalyzeReport): string => {
     ),
     '',
   )
+  const elementor = r.builders.elementor.details
+  const used = elementor?.widgets
+  if (used && typeof used === 'object' && !Array.isArray(used)) {
+    const widgets = Object.entries(used)
+    push(`Elementor widgets: ${widgets.map(([w, n]) => `${w} (${n})`).join(', ')}.`, '')
+    const missing = elementor?.withoutConverter
+    if (Array.isArray(missing) && missing.length > 0) {
+      push(`Without a converter, left out with a warning: ${missing.join(', ')}.`, '')
+    }
+  }
   const languages = r.multilingual.polylang.details?.languages
   if (Array.isArray(languages) && languages.length > 0)
     push(`Polylang languages: ${languages.join(', ')}.`, '')
