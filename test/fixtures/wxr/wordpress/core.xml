@@ -465,7 +465,7 @@
 		<link>https://core.example.com/2024/01/01/21/</link>
 		<pubDate>Mon, 01 Jan 2024 07:00:00 +0000</pubDate>
 		<dc:creator><![CDATA[]]></dc:creator>
-		<guid isPermaLink="false">https://core.example.com/2026/10/30/21/</guid>
+		<guid isPermaLink="false">https://core.example.com/?p=21</guid>
 		<description></description>
 		<content:encoded><![CDATA[ ]]></content:encoded>
 		<excerpt:encoded><![CDATA[]]></excerpt:encoded>
@@ -522,7 +522,7 @@
 		<link>https://core.example.com/2024/01/01/22/</link>
 		<pubDate>Mon, 01 Jan 2024 07:00:00 +0000</pubDate>
 		<dc:creator><![CDATA[]]></dc:creator>
-		<guid isPermaLink="false">https://core.example.com/2026/10/30/22/</guid>
+		<guid isPermaLink="false">https://core.example.com/?p=22</guid>
 		<description></description>
 		<content:encoded><![CDATA[ ]]></content:encoded>
 		<excerpt:encoded><![CDATA[]]></excerpt:encoded>
@@ -579,7 +579,7 @@
 		<link>https://core.example.com/2024/01/01/rezepte/</link>
 		<pubDate>Mon, 01 Jan 2024 07:00:00 +0000</pubDate>
 		<dc:creator><![CDATA[]]></dc:creator>
-		<guid isPermaLink="false">https://core.example.com/2026/10/30/rezepte/</guid>
+		<guid isPermaLink="false">https://core.example.com/?p=23</guid>
 		<description></description>
 		<content:encoded><![CDATA[]]></content:encoded>
 		<excerpt:encoded><![CDATA[]]></excerpt:encoded>
@@ -636,7 +636,7 @@
 		<link>https://core.example.com/2024/01/01/sauerteig/</link>
 		<pubDate>Mon, 01 Jan 2024 07:00:00 +0000</pubDate>
 		<dc:creator><![CDATA[]]></dc:creator>
-		<guid isPermaLink="false">https://core.example.com/2026/10/30/sauerteig/</guid>
+		<guid isPermaLink="false">https://core.example.com/?p=24</guid>
 		<description></description>
 		<content:encoded><![CDATA[]]></content:encoded>
 		<excerpt:encoded><![CDATA[]]></excerpt:encoded>
@@ -693,7 +693,7 @@
 		<link>https://core.example.com/2024/01/01/onlineshop/</link>
 		<pubDate>Mon, 01 Jan 2024 07:00:00 +0000</pubDate>
 		<dc:creator><![CDATA[]]></dc:creator>
-		<guid isPermaLink="false">https://core.example.com/2026/10/30/onlineshop/</guid>
+		<guid isPermaLink="false">https://core.example.com/?p=25</guid>
 		<description></description>
 		<content:encoded><![CDATA[]]></content:encoded>
 		<excerpt:encoded><![CDATA[]]></excerpt:encoded>
@@ -750,7 +750,7 @@
 		<link>https://core.example.com/2024/01/01/26/</link>
 		<pubDate>Mon, 01 Jan 2024 07:00:00 +0000</pubDate>
 		<dc:creator><![CDATA[]]></dc:creator>
-		<guid isPermaLink="false">https://core.example.com/2026/10/30/26/</guid>
+		<guid isPermaLink="false">https://core.example.com/?p=26</guid>
 		<description></description>
 		<content:encoded><![CDATA[ ]]></content:encoded>
 		<excerpt:encoded><![CDATA[]]></excerpt:encoded>
@@ -807,7 +807,7 @@
 		<link>https://core.example.com/2024/01/01/impressum/</link>
 		<pubDate>Mon, 01 Jan 2024 07:00:00 +0000</pubDate>
 		<dc:creator><![CDATA[]]></dc:creator>
-		<guid isPermaLink="false">https://core.example.com/2026/10/30/impressum/</guid>
+		<guid isPermaLink="false">https://core.example.com/?p=27</guid>
 		<description></description>
 		<content:encoded><![CDATA[]]></content:encoded>
 		<excerpt:encoded><![CDATA[]]></excerpt:encoded>

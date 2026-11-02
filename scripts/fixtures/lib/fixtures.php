@@ -198,7 +198,10 @@ function fx_menu_item( int $menu_id, array $args ): int {
 	if ( is_wp_error( $id ) ) {
 		fx_fail( $id->get_error_message() );
 	}
-	// Menu items get the current time; give them a fixed one.
+	// Menu items get the current time, also in their GUID; give them fixed ones.
 	fx_fix_dates( (int) $id, '2024-01-01 08:00:00' );
+	global $wpdb;
+	$wpdb->update( $wpdb->posts, array( 'guid' => home_url( '/?p=' . $id ) ), array( 'ID' => $id ) );
+	clean_post_cache( $id );
 	return (int) $id;
 }
