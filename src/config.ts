@@ -1,5 +1,6 @@
 import { readFile } from 'node:fs/promises'
-import { resolve } from 'node:path'
+import { dirname, resolve } from 'node:path'
+import { isTimeZone } from './acf/time.js'
 import { DEFAULT_PATTERNS, type PathPatterns, validatePattern } from './paths/patterns.js'
 
 export const CONFIG_FILE = 'wp-to-payload.config.json'
@@ -86,6 +87,13 @@ export interface Config {
   }
   /** Copy author e-mail addresses. Off by default: they are personal data. */
   importAuthorEmails: boolean
+  /**
+   * ACF JSON files or directories (a theme's `acf-json`) with field groups that are not in the
+   * export. Relative paths start at the config file.
+   */
+  acfJson: string[]
+  /** IANA time zone of the site (`Europe/Vienna`), for ACF dates with times. */
+  timeZone?: string
 }
 
 export const DEFAULT_CONFIG: Config = {
@@ -121,6 +129,7 @@ export const DEFAULT_CONFIG: Config = {
   seo: { separator: '-' },
   media: { hosts: [] },
   importAuthorEmails: false,
+  acfJson: [],
 }
 
 export class ConfigError extends Error {
@@ -160,6 +169,8 @@ const KNOWN_KEYS = new Set([
   'media',
   'importAuthorEmails',
   'localization',
+  'acfJson',
+  'timeZone',
 ])
 
 type SettingType = 'string' | 'pattern' | 'boolean'
@@ -291,6 +302,14 @@ export const parseConfig = (raw: unknown, source = CONFIG_FILE): Config => {
   ) {
     throw new ConfigError(`${source}: localization.prefixDefaultLanguage must be true or false`)
   }
+  const acfJson =
+    typeof raw.acfJson === 'string' ? [raw.acfJson] : stringList(raw.acfJson, `${source}: acfJson`)
+  if (
+    raw.timeZone !== undefined &&
+    (typeof raw.timeZone !== 'string' || !isTimeZone(raw.timeZone))
+  ) {
+    throw new ConfigError(`${source}: timeZone must be a time zone such as "Europe/Vienna"`)
+  }
   return {
     paths,
     siteHosts: stringList(raw.siteHosts, 'siteHosts'),
@@ -310,6 +329,8 @@ export const parseConfig = (raw: unknown, source = CONFIG_FILE): Config => {
       locales: stringRecord(localization.locales, 'localization.locales'),
       prefixDefaultLanguage: localization.prefixDefaultLanguage === true,
     },
+    acfJson,
+    ...(typeof raw.timeZone === 'string' ? { timeZone: raw.timeZone } : {}),
   }
 }
 
@@ -333,5 +354,7 @@ export const loadConfig = async (cwd: string, path?: string): Promise<Config> =>
   } catch (error) {
     throw new ConfigError(`${file} is not valid JSON: ${(error as Error).message}`)
   }
-  return parseConfig(raw, file)
+  const config = parseConfig(raw, file)
+  config.acfJson = config.acfJson.map((p) => resolve(dirname(file), p))
+  return config
 }

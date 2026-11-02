@@ -143,19 +143,19 @@
   <wp:term_name><![CDATA[Deutsch]]></wp:term_name>
 </wp:term>
 <wp:term>
-  <wp:term_id>6</wp:term_id>
-  <wp:term_taxonomy>term_language</wp:term_taxonomy>
-  <wp:term_slug>pll_en</wp:term_slug>
-  <wp:term_parent/>
-  <wp:term_name><![CDATA[English]]></wp:term_name>
-</wp:term>
-<wp:term>
   <wp:term_id>5</wp:term_id>
   <wp:term_taxonomy>language</wp:term_taxonomy>
   <wp:term_slug>en</wp:term_slug>
   <wp:term_parent/>
   <wp:term_name><![CDATA[English]]></wp:term_name>
   <wp:term_description><![CDATA[a:3:{s:6:"locale";s:5:"en_US";s:3:"rtl";b:0;s:9:"flag_code";s:2:"us";}]]></wp:term_description>
+</wp:term>
+<wp:term>
+  <wp:term_id>6</wp:term_id>
+  <wp:term_taxonomy>term_language</wp:term_taxonomy>
+  <wp:term_slug>pll_en</wp:term_slug>
+  <wp:term_parent/>
+  <wp:term_name><![CDATA[English]]></wp:term_name>
 </wp:term>
 <wp:term>
   <wp:term_id>8</wp:term_id>
@@ -574,6 +574,22 @@
     <wp:meta_key>_thumbnail_id</wp:meta_key>
     <wp:meta_value><![CDATA[1]]></wp:meta_value>
   </wp:postmeta>
+  <wp:postmeta>
+    <wp:meta_key>subtitle</wp:meta_key>
+    <wp:meta_value><![CDATA[Aus heimischer Eiche]]></wp:meta_value>
+  </wp:postmeta>
+  <wp:postmeta>
+    <wp:meta_key>_subtitle</wp:meta_key>
+    <wp:meta_value><![CDATA[field_ml_subtitle]]></wp:meta_value>
+  </wp:postmeta>
+  <wp:postmeta>
+    <wp:meta_key>wood</wp:meta_key>
+    <wp:meta_value><![CDATA[eiche]]></wp:meta_value>
+  </wp:postmeta>
+  <wp:postmeta>
+    <wp:meta_key>_wood</wp:meta_key>
+    <wp:meta_value><![CDATA[field_ml_wood]]></wp:meta_value>
+  </wp:postmeta>
 </item>
 <item>
   <title><![CDATA[New workbench]]></title>
@@ -624,6 +640,22 @@
   <wp:postmeta>
     <wp:meta_key>_wp_old_slug</wp:meta_key>
     <wp:meta_value><![CDATA[new-bench]]></wp:meta_value>
+  </wp:postmeta>
+  <wp:postmeta>
+    <wp:meta_key>subtitle</wp:meta_key>
+    <wp:meta_value><![CDATA[Made of local oak]]></wp:meta_value>
+  </wp:postmeta>
+  <wp:postmeta>
+    <wp:meta_key>_subtitle</wp:meta_key>
+    <wp:meta_value><![CDATA[field_ml_subtitle]]></wp:meta_value>
+  </wp:postmeta>
+  <wp:postmeta>
+    <wp:meta_key>wood</wp:meta_key>
+    <wp:meta_value><![CDATA[eiche]]></wp:meta_value>
+  </wp:postmeta>
+  <wp:postmeta>
+    <wp:meta_key>_wood</wp:meta_key>
+    <wp:meta_value><![CDATA[field_ml_wood]]></wp:meta_value>
   </wp:postmeta>
 </item>
 <item>
@@ -1276,6 +1308,78 @@
     <wp:meta_key>_menu_item_url</wp:meta_key>
     <wp:meta_value><![CDATA[]]></wp:meta_value>
   </wp:postmeta>
+</item>
+<item>
+  <title><![CDATA[Zusatzdaten]]></title>
+  <link>https://multilingual.example.com/?post_type=acf-field-group&amp;p=26</link>
+  <pubDate>Mon, 01 Jan 2024 07:00:00 +0000</pubDate>
+  <dc:creator/>
+  <guid isPermaLink="false">https://multilingual.example.com/?post_type=acf-field-group&amp;p=26</guid>
+  <description/>
+  <content:encoded><![CDATA[a:11:{s:8:"location";a:1:{i:0;a:1:{i:0;a:3:{s:5:"param";s:9:"post_type";s:8:"operator";s:2:"==";s:5:"value";s:4:"post";}}}s:8:"position";s:6:"normal";s:5:"style";s:7:"default";s:15:"label_placement";s:3:"top";s:21:"instruction_placement";s:5:"label";s:14:"hide_on_screen";a:0:{}s:11:"description";s:0:"";s:12:"show_in_rest";b:0;s:13:"display_title";s:0:"";s:15:"allow_ai_access";b:0;s:14:"ai_description";s:0:"";}]]></content:encoded>
+  <excerpt:encoded><![CDATA[zusatzdaten]]></excerpt:encoded>
+  <wp:post_id>26</wp:post_id>
+  <wp:post_date>2024-01-01 08:00:00</wp:post_date>
+  <wp:post_date_gmt>2024-01-01 07:00:00</wp:post_date_gmt>
+  <wp:post_modified>2024-01-01 08:00:00</wp:post_modified>
+  <wp:post_modified_gmt>2024-01-01 07:00:00</wp:post_modified_gmt>
+  <wp:comment_status>closed</wp:comment_status>
+  <wp:ping_status>closed</wp:ping_status>
+  <wp:post_name>group_ml_post</wp:post_name>
+  <wp:status>publish</wp:status>
+  <wp:post_parent>0</wp:post_parent>
+  <wp:menu_order>0</wp:menu_order>
+  <wp:post_type>acf-field-group</wp:post_type>
+  <wp:post_password/>
+  <wp:is_sticky>0</wp:is_sticky>
+</item>
+<item>
+  <title><![CDATA[Untertitel]]></title>
+  <link>https://multilingual.example.com/?post_type=acf-field&amp;p=27</link>
+  <pubDate>Mon, 01 Jan 2024 07:00:00 +0000</pubDate>
+  <dc:creator/>
+  <guid isPermaLink="false">https://multilingual.example.com/?post_type=acf-field&amp;p=27</guid>
+  <description/>
+  <content:encoded><![CDATA[a:11:{s:10:"aria-label";s:0:"";s:4:"type";s:4:"text";s:12:"instructions";s:0:"";s:8:"required";b:0;s:17:"conditional_logic";b:0;s:7:"wrapper";a:3:{s:5:"width";s:0:"";s:5:"class";s:0:"";s:2:"id";s:0:"";}s:13:"default_value";s:0:"";s:9:"maxlength";s:0:"";s:11:"placeholder";s:0:"";s:7:"prepend";s:0:"";s:6:"append";s:0:"";}]]></content:encoded>
+  <excerpt:encoded><![CDATA[subtitle]]></excerpt:encoded>
+  <wp:post_id>27</wp:post_id>
+  <wp:post_date>2024-01-01 08:00:00</wp:post_date>
+  <wp:post_date_gmt>2024-01-01 07:00:00</wp:post_date_gmt>
+  <wp:post_modified>2024-01-01 08:00:00</wp:post_modified>
+  <wp:post_modified_gmt>2024-01-01 07:00:00</wp:post_modified_gmt>
+  <wp:comment_status>closed</wp:comment_status>
+  <wp:ping_status>closed</wp:ping_status>
+  <wp:post_name>field_ml_subtitle</wp:post_name>
+  <wp:status>publish</wp:status>
+  <wp:post_parent>26</wp:post_parent>
+  <wp:menu_order>0</wp:menu_order>
+  <wp:post_type>acf-field</wp:post_type>
+  <wp:post_password/>
+  <wp:is_sticky>0</wp:is_sticky>
+</item>
+<item>
+  <title><![CDATA[Holz]]></title>
+  <link>https://multilingual.example.com/?post_type=acf-field&amp;p=28</link>
+  <pubDate>Mon, 01 Jan 2024 07:00:00 +0000</pubDate>
+  <dc:creator/>
+  <guid isPermaLink="false">https://multilingual.example.com/?post_type=acf-field&amp;p=28</guid>
+  <description/>
+  <content:encoded><![CDATA[a:16:{s:10:"aria-label";s:0:"";s:4:"type";s:6:"select";s:12:"instructions";s:0:"";s:8:"required";b:0;s:17:"conditional_logic";b:0;s:7:"wrapper";a:3:{s:5:"width";s:0:"";s:5:"class";s:0:"";s:2:"id";s:0:"";}s:7:"choices";a:2:{s:5:"eiche";s:5:"Eiche";s:5:"buche";s:5:"Buche";}s:8:"multiple";i:0;s:10:"allow_null";i:0;s:13:"default_value";b:0;s:2:"ui";i:0;s:4:"ajax";i:0;s:11:"placeholder";s:0:"";s:13:"return_format";s:5:"value";s:14:"create_options";i:0;s:12:"save_options";i:0;}]]></content:encoded>
+  <excerpt:encoded><![CDATA[wood]]></excerpt:encoded>
+  <wp:post_id>28</wp:post_id>
+  <wp:post_date>2024-01-01 08:00:00</wp:post_date>
+  <wp:post_date_gmt>2024-01-01 07:00:00</wp:post_date_gmt>
+  <wp:post_modified>2024-01-01 08:00:00</wp:post_modified>
+  <wp:post_modified_gmt>2024-01-01 07:00:00</wp:post_modified_gmt>
+  <wp:comment_status>closed</wp:comment_status>
+  <wp:ping_status>closed</wp:ping_status>
+  <wp:post_name>field_ml_wood</wp:post_name>
+  <wp:status>publish</wp:status>
+  <wp:post_parent>26</wp:post_parent>
+  <wp:menu_order>1</wp:menu_order>
+  <wp:post_type>acf-field</wp:post_type>
+  <wp:post_password/>
+  <wp:is_sticky>0</wp:is_sticky>
 </item>
   </channel>
 </rss>

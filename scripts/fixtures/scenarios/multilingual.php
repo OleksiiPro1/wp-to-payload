@@ -1,12 +1,13 @@
 <?php
 /**
  * Title: Tischlerei Beispiel
- * Plugins: polylang@3.9.1
+ * Plugins: polylang@3.9.1, secure-custom-fields@6.9.7
  *
  * A German and English site with Polylang. German is the default language and has no URL prefix;
  * English pages live under /en/. Pages, posts, categories, tags and images are translated; some
  * items exist in one language only, one translation is still a draft, and an English post has
- * an earlier slug. Each language has its own menu. All content is made up.
+ * an earlier slug. Each language has its own menu. Posts have custom fields (Secure Custom
+ * Fields, which stores them as ACF does), with values per language. All content is made up.
  */
 
 require __DIR__ . '/../lib/fixtures.php';
@@ -336,6 +337,46 @@ fx_menu_item(
 		'menu-item-position'  => 1,
 	)
 );
+
+// Custom fields are post meta, so each language version has values of its own. They are added
+// last, so the IDs of everything above stay the same.
+acf_import_field_group(
+	array(
+		'key'      => 'group_ml_post',
+		'title'    => 'Zusatzdaten',
+		'location' => array( array( array( 'param' => 'post_type', 'operator' => '==', 'value' => 'post' ) ) ),
+		'fields'   => array(
+			array( 'key' => 'field_ml_subtitle', 'label' => 'Untertitel', 'name' => 'subtitle', 'type' => 'text' ),
+			array(
+				'key'     => 'field_ml_wood',
+				'label'   => 'Holz',
+				'name'    => 'wood',
+				'type'    => 'select',
+				'choices' => array(
+					'eiche' => 'Eiche',
+					'buche' => 'Buche',
+				),
+			),
+		),
+	)
+);
+update_field( 'field_ml_subtitle', 'Aus heimischer Eiche', $bench_de );
+update_field( 'field_ml_wood', 'eiche', $bench_de );
+update_field( 'field_ml_subtitle', 'Made of local oak', $bench_en );
+update_field( 'field_ml_wood', 'eiche', $bench_en );
+fx_fix_modified( $bench_de, '2024-02-01 10:00:00' );
+fx_fix_modified( $bench_en, '2024-02-02 08:00:00' );
+$definitions = get_posts(
+	array(
+		'post_type'   => array( 'acf-field-group', 'acf-field' ),
+		'post_status' => 'any',
+		'numberposts' => -1,
+		'fields'      => 'ids',
+	)
+);
+foreach ( $definitions as $id ) {
+	fx_fix_dates( $id, '2024-01-01 08:00:00' );
+}
 
 // Polylang names translation groups with uniqid(). Stable names keep the export the same on
 // every run; the names mean nothing else.

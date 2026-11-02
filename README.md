@@ -81,13 +81,19 @@ writing anything.
 | Old URLs                                                                                                                         | Redirects in six formats or in the Payload redirects plugin                                         | ✅  |
 | Custom post types                                                                                                                | A collection each (`recipes` for `recipe`) with the fields of posts; parents for hierarchical types | ✅  |
 | Custom taxonomies                                                                                                                | A collection each, with hierarchy, related from the documents                                       | ✅  |
-| Custom fields of posts and custom post types (ACF, other post meta)                                                              | Not imported yet                                                                                    | ❌  |
+| ACF and Secure Custom Fields: text, number, choice, date, link, image, file, gallery, relationship and taxonomy fields           | Fields of the collection (`recipe.baking_time`), written by `scaffold`; values per locale           | ✅  |
+| ACF groups, repeaters and flexible content                                                                                       | Groups, arrays and blocks                                                                           | ✅  |
+| ACF field groups that exist only in the theme (local JSON)                                                                       | Read with `--acf-json`; groups registered in PHP need ACF's JSON export                             | ⚠️  |
+| ACF clone, map, user, message and tab fields                                                                                     | Listed in the report, not imported                                                                  | ❌  |
+| ACF password fields                                                                                                              | Never imported                                                                                      | ❌  |
+| ACF options pages and ACF blocks                                                                                                 | Not imported (options are not in the export; ACF blocks are reported as plugin blocks)              | ❌  |
+| Other post meta of plugins                                                                                                       | Not imported                                                                                        | ❌  |
 | Comments, menus                                                                                                                  | Counted and reported, not imported                                                                  | ❌  |
-| Post types of plugins: forms and their entries, page builder templates, ACF settings                                             | Listed in the reports, never imported                                                               | ❌  |
+| Post types of plugins: forms and their entries, page builder templates, ACF settings                                             | Listed in the reports, never imported (ACF field groups are read for the fields)                    | ❌  |
 | Polylang: languages and translations of posts, pages, custom post types, terms and images                                        | One document per translation group, texts per Payload locale; redirects per language                | ✅  |
 | WPML with its WPML Export and Import add-on (experimental)                                                                       | As for Polylang, from the add-on's documented post meta                                             | ⚠️  |
 | WPML without the add-on                                                                                                          | Languages from the URL directories, translations stay separate documents                            | ⚠️  |
-| WooCommerce, ACF                                                                                                                 | Detected and reported, not imported                                                                 | ❌  |
+| WooCommerce                                                                                                                      | Detected and reported, not imported                                                                 | ❌  |
 | All in One SEO, SEOPress                                                                                                         | Detected only                                                                                       | ❌  |
 | Users, passwords, roles                                                                                                          | Never imported                                                                                      | ❌  |
 
@@ -98,20 +104,21 @@ writing anything.
 ### analyze
 
 ```bash
-npx wp-to-payload analyze export.xml [--out <dir>] [--json]
+npx wp-to-payload analyze export.xml [--out <dir>] [--json] [--acf-json <path>]
 ```
 
 Writes `report.json` and `report.md` to `wp-to-payload-report/` and prints a summary: counts of
 posts, pages, media, categories, tags, authors and comments; custom post types and taxonomies
 with what the import does with them; every Gutenberg block with how the import handles it; shortcodes; page builders; SEO plugins;
-WPML and Polylang; WooCommerce; ACF. It ends with a rating, **simple**, **medium** or
+WPML and Polylang; WooCommerce; ACF field groups with the collections they go into and the
+fields that are not imported. It ends with a rating, **simple**, **medium** or
 **complex**, and lists the reasons behind it. Page builders, WooCommerce and multilingual
 content always make a site complex. `analyze` never needs Payload.
 
 ### scaffold
 
 ```bash
-npx wp-to-payload scaffold [export.xml] [--out <dir>] [--slug-prefix <prefix>] [--force]
+npx wp-to-payload scaffold [export.xml] [--out <dir>] [--slug-prefix <prefix>] [--acf-json <path>] [--force]
 ```
 
 Writes collection configs to `src/collections/wp/`: `Posts`, `Pages`, `Categories`, `Tags`,
@@ -124,7 +131,8 @@ taxonomy in it: `recipe` becomes `Recipes` (slug `recipes`) with the fields of p
 field when its items have parents, and a relationship field for each taxonomy its items use
 (`recipeCategories` for `recipe_category`). Post types of plugins, such as forms or page builder
 templates, get none. Delete the files of types you do not need; the import skips types without
-a collection and says so.
+a collection and says so. The collections also get the site's ACF fields; see
+[Custom fields](#custom-fields-acf).
 
 The files are yours afterwards; existing files are never overwritten without `--force`. If
 your project already has collections with these slugs (the Payload website template has
@@ -155,6 +163,8 @@ their collections, as in `--only recipes`.
 | `--concurrency <n>`   | Parallel downloads (default 4)                                                |
 | `--max-media-mb <n>`  | Skip larger files (default 100)                                               |
 | `--report-dir <dir>`  | Where `import-report.json` and `import-report.md` go                          |
+| `--acf-json <path>`   | ACF field groups that are not in the export; repeatable                       |
+| `--time-zone <zone>`  | The site's time zone for ACF dates with times, e.g. `Europe/Vienna`           |
 
 Path options (`--post-path` and others, see [URLs](#urls)) are accepted too, because links in
 the content are rewritten to the new URLs.
@@ -234,7 +244,9 @@ project root. Everything is optional:
   "seo": { "separator": "|" },
   "media": { "hosts": ["cdn.example.com"] },
   "importAuthorEmails": false,
-  "localization": { "defaultLanguage": "de", "locales": { "de": "de", "en": "en" } }
+  "localization": { "defaultLanguage": "de", "locales": { "de": "de", "en": "en" } },
+  "acfJson": ["wp-content/themes/my-theme/acf-json"],
+  "timeZone": "Europe/Vienna"
 }
 ```
 
@@ -260,6 +272,9 @@ project root. Everything is optional:
   language (otherwise the one whose URLs have no language directory); `locales`, WordPress
   language → Payload locale where the codes differ; `prefixDefaultLanguage`, to give the
   default language a directory in new URLs too.
+- `acfJson`: ACF JSON files or folders with field groups that are not in the export, relative
+  to the config file. `--acf-json` adds more.
+- `timeZone`: the site's time zone, for ACF dates with times (WordPress stores them without one).
 
 ## Multilingual sites
 
@@ -268,8 +283,8 @@ items per language and how complete the translations are, `scaffold export.xml` 
 collections with localized fields and prints the `localization` block for `payload.config.ts`,
 and `import` turns each translation group into one document with a value per locale:
 
-- Localized: title, slug, content, excerpt, featured image, the SEO fields; for terms title,
-  slug and description; for media alt text and caption. Relations, the author and the date come
+- Localized: title, slug, content, excerpt, featured image, the SEO fields and ACF fields; for
+  terms title, slug, description and ACF fields; for media alt text and caption. Relations, the author and the date come
   from the default language's version.
 - `wpId` is the smallest WordPress ID of the group and `wpIds` holds all of them, so a later
   import, also with a translation that is new, updates the same document.
@@ -286,6 +301,49 @@ them into the export (`_wpml_import_language_code`, `_wpml_import_source_languag
 `_wpml_import_translation_group`). Only these documented keys are read. Without them the
 language of an item comes from its URL directory and translations stay separate documents.
 
+## Custom fields (ACF)
+
+Advanced Custom Fields and Secure Custom Fields (the community fork, which stores data the same
+way) keep their field groups in the export. `analyze` lists them, `scaffold export.xml` writes
+their fields into the collections, and `import` fills them. A group goes into the collections
+of the post types and taxonomies its location rules name, and of those whose items have values
+of its fields.
+
+| ACF                                              | Payload                                                     |
+| ------------------------------------------------ | ----------------------------------------------------------- |
+| text, textarea, email, number, range             | `text`, `textarea`, `email`, `number`                       |
+| url, oEmbed, color picker, time picker           | `text`                                                      |
+| WYSIWYG                                          | `richText`, converted like post content                     |
+| image, file, gallery                             | `upload` to the media collection (gallery: `hasMany`)       |
+| select, checkbox, radio, button group            | `select` (checkbox and multiple: `hasMany`), `radio`        |
+| true / false                                     | `checkbox`                                                  |
+| date picker, date time picker                    | `date`                                                      |
+| link                                             | `group` of `label`, `url` and `newTab`                      |
+| post object, page link, relationship             | `relationship` to the collections of the allowed post types |
+| taxonomy                                         | `relationship` to the taxonomy's collection                 |
+| group, repeater, flexible content                | `group`, `array`, `blocks` (a block per layout)             |
+| clone, Google map, user, message, tab, accordion | Not imported; listed in the report                          |
+| password                                         | Never imported                                              |
+
+- Fields keep their ACF names at the top level of the collection (`recipe.baking_time`). A name
+  the collection uses already, such as `excerpt`, becomes `acf_excerpt`, and the report says so
+  (`ACF_FIELD_RENAMED`).
+- Blocks are named after their layout. Payload needs one name per block across the whole
+  config, so when two flexible fields have a layout of the same name, the field's name goes in
+  front (`sections_quote`).
+- Links in text and link fields point to the new URLs. Relations to items that come later in
+  the export are set once those exist.
+- On multilingual sites every ACF field is localized, so each language keeps its own values.
+- Groups that a theme registers in code are not in the export, but their values are. Pass the
+  theme's `acf-json` folder, or a JSON file from ACF's export tool (Tools → Export field groups),
+  with `--acf-json`. Without it, the report names the values whose fields are unknown
+  (`ACF_FIELD_UNKNOWN`).
+- Dates with times have no time zone in WordPress. Set `timeZone` (or `--time-zone`) for exact
+  values; otherwise the offset that most posts of the export have is used.
+- Values that do not fit their field (a choice that no longer exists, a number that is not
+  one) are left out and reported (`ACF_VALUE_INVALID`). A field your collection does not have is
+  reported once (`FIELD_MISSING`) and not imported.
+
 ## Limitations
 
 - **Page builders.** For Elementor, Divi, WPBakery, Beaver Builder and Avada, the text and
@@ -295,7 +353,7 @@ language of an item comes from its URL directory and translations stay separate 
   upload is a block of its own.
 - **Internal links** become links to the new URL, not Lexical links to the document.
 - **Custom post types** come over with title, slug, content, excerpt, dates, author, featured
-  image, SEO data and taxonomies. Their custom fields are not imported yet. WordPress does not
+  image, SEO data, taxonomies and ACF fields. Other post meta is not imported. WordPress does not
   export how a type was registered: whether it is hierarchical is read from its items, and a
   plugin's internal types are recognised by name (form plugins, page builders, ACF, WooCommerce).
 - **The Payload website template's pages** are built from layout blocks and have no `content`
@@ -313,7 +371,7 @@ language of an item comes from its URL directory and translations stay separate 
 ## Roadmap
 
 - WooCommerce products
-- ACF fields
+- ACF options pages and ACF blocks
 - Comments and menus
 - Reusable blocks (synced patterns) inlined into the content
 - Lexical internal links to documents

@@ -41,6 +41,7 @@ src/
   paths/      URL patterns and old-to-new URL mapping
   redirects/  redirect map and its six formats
   seo/        Yoast and Rank Math
+  acf/        ACF field groups, the plan of their Payload fields, and their values
   scaffold/   collection templates
   import/     the import: runner (inside `payload run`), schema checks, media, Lexical
   commands/   one file per CLI command
@@ -115,16 +116,21 @@ site title and the plugins to install:
 require __DIR__ . '/../lib/fixtures.php';
 ```
 
-The helpers in `scripts/fixtures/lib/fixtures.php` create posts, terms, users, images and menu
-items with fixed dates. `scripts/fixtures/mu-plugins/` holds our own small plugins for the
-test sites, such as the custom post types of the `core` scenario.
+The helpers in `scripts/fixtures/lib/fixtures.php` create posts, terms, users, images, files
+and menu items with fixed dates. `scripts/fixtures/mu-plugins/` holds our own small plugins for
+the test sites, such as the custom post types of the `core` scenario.
+`scripts/fixtures/acf-json/` holds a field group that the `custom-fields` scenario registers in
+code, as themes do; it is not in the export, and the tests pass it with `--acf-json`.
 
 - Content is synthetic, like all fixtures: made-up names and texts, `example.com` addresses.
   The admin password is random, and exports contain no user passwords.
 - Plugins are only installed into the throwaway site. Their code never enters this repository;
   `plugins.sh` builds them in `scripts/fixtures/out/`, which git ignores.
 - Plugins that name things with random IDs (Polylang's translation groups) get stable names in
-  the scenario script, so the exports stay comparable.
+  the scenario script, and items that plugins stamp with the current time (ACF field groups,
+  images that ACF attaches to a post) get fixed dates, so the exports stay comparable.
+- ACF values are saved by field key (`update_field('field_…', …)`), as the editor does; by name,
+  ACF may take a field of another group with the same name.
 
 ## Changes
 

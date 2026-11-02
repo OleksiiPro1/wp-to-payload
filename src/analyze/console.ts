@@ -46,6 +46,14 @@ export const printSummary = (r: AnalyzeReport): void => {
       `  Languages    ${l.languages.map((x) => `${x.code} (${x.items})`).join(', ')}, default ${l.defaultLanguage}; ${l.groups.complete + l.groups.incomplete} translation groups`,
     )
   }
+  if (r.customFields) {
+    const c = r.customFields
+    const imported = c.collections.reduce((n, x) => n + x.fields.length, 0)
+    const skipped = c.notes.filter((n) => n.code === 'ACF_FIELD_SKIPPED').length
+    out(
+      `  ACF fields   ${c.groups.length} groups; ${imported} fields in ${c.collections.map((x) => x.collection).join(', ') || 'no collection'}${skipped > 0 ? `, ${skipped} not imported` : ''}${c.undefinedValues.length > 0 ? `, ${c.undefinedValues.length} without a definition` : ''}`,
+    )
+  }
   const pluginData = r.customTypes.postTypes.filter((t) => !t.imported)
   if (pluginData.length > 0) {
     out(

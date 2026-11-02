@@ -1,5 +1,8 @@
 import { stat } from 'node:fs/promises'
 import { basename } from 'node:path'
+import { AcfCollector } from '../acf/collect.js'
+import { type AcfField, type AcfFieldGroup, loadAcfJson } from '../acf/definitions.js'
+import { planSiteAcf } from '../acf/site.js'
 import { BUILDERS, type Builder, detectBuilders } from '../content/builders.js'
 import { BLOCK_OPENER, blockSupport, hasBlocks, normalizeBlockName } from '../content/blocks.js'
 import { scanShortcodes } from '../content/shortcodes-scan.js'
@@ -21,6 +24,7 @@ import { scoreComplexity } from './complexity.js'
 import type {
   AnalyzeReport,
   BlockUsage,
+  CustomFieldsReport,
   CustomPostType,
   CustomTaxonomy,
   Detection,
@@ -97,8 +101,17 @@ const bumpUsage = (map: Map<string, Usage>, name: string, count: number) => {
 const byCount = <T extends { name: string; count: number }>(a: T, b: T) =>
   b.count - a.count || a.name.localeCompare(b.name)
 
+export interface AnalyzeOptions {
+  /** ACF JSON files or folders with field groups that are not in the export. */
+  acfJson?: string[]
+}
+
 /** Streams an export once and builds the analysis report. Needs no Payload project. */
-export const analyzeExport = async (file: string): Promise<AnalyzeReport> => {
+export const analyzeExport = async (
+  file: string,
+  options: AnalyzeOptions = {},
+): Promise<AnalyzeReport> => {
+  const acfJson: AcfFieldGroup[] = await loadAcfJson(options.acfJson ?? [])
   let site: WxrSite | undefined
   const terms: WxrTerm[] = []
   const termKeys = new Set<string>()
@@ -139,6 +152,8 @@ export const analyzeExport = async (file: string): Promise<AnalyzeReport> => {
   const acf = emptyDetection()
   let acfFieldGroups = 0
   let acfFields = 0
+  const acfCollector = new AcfCollector()
+  const typeOfPost = new Map<number, string>()
 
   const scanContent = (item: WxrItem) => {
     const content = item.content
@@ -177,12 +192,15 @@ export const analyzeExport = async (file: string): Promise<AnalyzeReport> => {
         terms.push(record.term)
         surveyor.addTerm(record.term)
         languageCollector.addTerm(record.term)
+        acfCollector.addTerm(record.term)
       }
       continue
     }
 
     const { item } = record
     surveyor.addItem(item)
+    acfCollector.addItem(item)
+    typeOfPost.set(item.id, item.type)
     const wpmlKeys = wpmlKeysOf(item.meta)
     languageCollector.addItem(
       {
@@ -349,6 +367,62 @@ export const analyzeExport = async (file: string): Promise<AnalyzeReport> => {
     })
   }
 
+  // ACF fields, as the import would bring them over with the default settings.
+  let customFields: CustomFieldsReport | undefined
+  const acfIndex = acfCollector.result()
+  if (acf.detected || acfJson.length > 0) {
+    const plan = planSiteAcf({
+      acf: acfIndex,
+      json: acfJson,
+      config: DEFAULT_CONFIG,
+      types,
+      survey,
+      typeOfPost: (id) => typeOfPost.get(id),
+      localized: languagesReport !== undefined,
+    })
+    const fieldTypes: Record<string, number> = {}
+    for (const field of plan.definitions.fields.values()) bump(fieldTypes, field.type || 'unknown')
+    const countFields = (fields: AcfField[]): number =>
+      fields.reduce(
+        (n, f) =>
+          n +
+          1 +
+          countFields(f.subFields) +
+          f.layouts.reduce((m, l) => m + countFields(l.subFields), 0),
+        0,
+      )
+    const placed = new Map<string, string[]>()
+    for (const c of plan.collections.values()) {
+      for (const { group } of c.groups)
+        placed.set(group.key, [...(placed.get(group.key) ?? []), c.collection])
+    }
+    customFields = {
+      groups: plan.definitions.groups.map((g) => ({
+        key: g.key,
+        title: g.title,
+        source: g.source,
+        fields: countFields(g.fields),
+        collections: placed.get(g.key) ?? [],
+        elsewhere: plan.unplaced.find((u) => u.group === g)?.where ?? [],
+      })),
+      fieldTypes,
+      collections: [...plan.collections.values()].map((c) => ({
+        collection: c.collection,
+        fields: c.fields.map((f) => f.name),
+      })),
+      notes: plan.notes.map((n) => ({
+        code: n.code,
+        collection: n.collection,
+        field: n.path,
+        type: n.field.type,
+        message: n.message,
+        ...(n.values === undefined ? {} : { values: n.values }),
+      })),
+      undefinedValues: plan.undefinedValues,
+      dateTimeFields: plan.dateTimeFields,
+    }
+  }
+
   const toList = (map: Map<string, Usage>): NamedCount[] =>
     [...map].map(([name, u]) => ({ name, count: u.count, items: u.items })).sort(byCount)
 
@@ -412,6 +486,7 @@ export const analyzeExport = async (file: string): Promise<AnalyzeReport> => {
     multilingual: { wpml, polylang },
     woocommerce: woo,
     acf,
+    ...(customFields ? { customFields } : {}),
     complexity: { level: 'simple', score: 0, reasons: [] },
     issues,
   }

@@ -8,6 +8,18 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- ACF fields (Advanced Custom Fields and Secure Custom Fields). Field groups are read from the
+  export, and from ACF JSON files with the new `--acf-json` option or `acfJson` setting for
+  groups that a theme keeps in code. `scaffold` writes their fields into the collections of the
+  post types and taxonomies they apply to, under their ACF names (`recipe.baking_time`;
+  `acf_excerpt` when the collection has the name already). `import` fills them from post meta
+  and term meta: text, number, choice, date, link, image, file, gallery, relationship and
+  taxonomy fields, groups, repeaters (arrays) and flexible content (blocks), with WYSIWYG fields
+  converted like post content and a value per locale on multilingual sites. Clone, map, user,
+  message and tab fields are reported, password fields never imported. `analyze` lists the
+  groups and what happens to their fields. New setting `timeZone` (and `--time-zone`) for dates
+  with times; new warning codes `ACF_FIELD_SKIPPED`, `ACF_FIELD_RENAMED`, `ACF_FIELD_UNKNOWN`
+  and `ACF_VALUE_INVALID`.
 - Multilingual sites. Polylang's languages and translation groups, and WPML's through the post
   meta of its WPML Export and Import add-on (experimental), become Payload localization: one
   document per translation group with title, slug, content, excerpt, featured image, SEO fields,
@@ -27,7 +39,8 @@ All notable changes to this project are documented here. The format follows
 - `postTypes` and `taxonomies` in the config file: collection, path, hierarchy, and for
   taxonomies the old archive base and the relationship field.
 - Post types of plugins (form definitions and entries, page builder templates, ACF settings,
-  WooCommerce) are recognised and never imported; naming one under `postTypes` imports it.
+  WooCommerce) are recognised and never imported as documents; naming one under `postTypes`
+  imports it.
 - Warning codes `COLLECTION_MISSING` (a step's collection does not exist) and `TYPE_SKIPPED`
   (items of a plugin's post type).
 - Term meta (`wp:termmeta`) is read from exports, and a reader for PHP `serialize()` data
@@ -35,6 +48,8 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- ACF adds 1 point to the complexity score of `analyze` instead of 2, since its fields are
+  imported now; values that are lost or have no field definition add more.
 - The required Node.js version is now what the dependencies need: 22.22.2 or newer on Node 22,
   24.15 or newer on Node 24, or Node 26 and later (jsdom 30). `engines` said 22.12, so npm
   warned about jsdom and its dependencies (`EBADENGINE`) on earlier Node 22 releases.
@@ -46,6 +61,9 @@ All notable changes to this project are documented here. The format follows
 
 ### Development
 
+- A fixture site with Secure Custom Fields 6.9.7 that uses every field type, including the ones
+  ACF has only in its paid version (repeater, flexible content, gallery, clone), and the
+  Polylang site has custom fields per language now.
 - A German and English fixture site with Polylang 3.9.1. When wordpress.org cannot be reached,
   the fixture generator builds plugins from their official Git repositories.
 - Test fixtures from real WordPress 7.1 sites, built in Docker by `scripts/fixtures` and

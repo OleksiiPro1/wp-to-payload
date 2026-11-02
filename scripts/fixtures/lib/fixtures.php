@@ -133,6 +133,31 @@ function fx_image( string $filename, array $rgb, int $width, int $height, array 
 	return $id;
 }
 
+/** A file other than an image in the media library, such as a PDF. */
+function fx_file( string $filename, string $content, string $mime_type, string $date ): int {
+	$upload = wp_upload_bits( $filename, null, $content, substr( $date, 0, 4 ) . '/' . substr( $date, 5, 2 ) );
+	if ( ! empty( $upload['error'] ) ) {
+		fx_fail( $upload['error'] );
+	}
+	$id = wp_insert_attachment(
+		array(
+			'post_mime_type' => $mime_type,
+			'post_title'     => pathinfo( $filename, PATHINFO_FILENAME ),
+			'post_status'    => 'inherit',
+			'post_date'      => $date,
+			'post_date_gmt'  => get_gmt_from_date( $date ),
+		),
+		$upload['file'],
+		0,
+		true
+	);
+	if ( is_wp_error( $id ) ) {
+		fx_fail( $id->get_error_message() );
+	}
+	fx_fix_modified( $id, $date );
+	return $id;
+}
+
 /** An approved comment with a fixed date. */
 function fx_comment( int $post_id, string $author, string $text, string $date ): int {
 	return (int) wp_insert_comment(

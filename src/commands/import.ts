@@ -13,7 +13,14 @@ import {
   UsageError,
 } from '../cli/command.js'
 import { fail, info, out, warn } from '../cli/output.js'
-import { configFromOptions, PATH_HELP, PATH_OPTIONS } from '../cli/shared.js'
+import {
+  ACF_HELP,
+  ACF_OPTIONS,
+  applyAcfOptions,
+  configFromOptions,
+  PATH_HELP,
+  PATH_OPTIONS,
+} from '../cli/shared.js'
 import { type Phase, PHASES } from '../import/phases.js'
 import { findPackageDir } from '../import/project.js'
 import { OPTIONS_ENV, type RunnerOptions, type RunnerResult } from '../import/runner-options.js'
@@ -40,6 +47,8 @@ export const importCommand: Command = {
       '--report-dir <dir>',
       'Where to write import-report.json and .md (default: wp-to-payload-report)',
     ],
+    ...ACF_HELP,
+    ['--time-zone <zone>', 'Time zone of the site for ACF dates with times, e.g. Europe/Vienna'],
     ...PATH_HELP,
   ],
   options: {
@@ -54,6 +63,8 @@ export const importCommand: Command = {
     'media-host': { type: 'string', multiple: true },
     'max-media-mb': { type: 'string' },
     'report-dir': { type: 'string' },
+    ...ACF_OPTIONS,
+    'time-zone': { type: 'string' },
     ...PATH_OPTIONS,
   },
   async run(ctx) {
@@ -70,7 +81,7 @@ export const importCommand: Command = {
     if (uploadsDir && !existsSync(resolve(ctx.cwd, uploadsDir))) {
       throw new UsageError(`--uploads-dir ${uploadsDir} does not exist`)
     }
-    const config = await configFromOptions(ctx)
+    const config = applyAcfOptions(ctx, await configFromOptions(ctx))
 
     const payloadDir = findPackageDir('payload', ctx.cwd)
     if (!payloadDir) {

@@ -1,4 +1,5 @@
 import type { Readable } from 'node:stream'
+import { AcfCollector, type AcfIndex } from '../acf/collect.js'
 import { type WpmlKeys, wpmlKeysOf } from '../languages.js'
 import { decodeEntities } from '../util/entities.js'
 import { mimeTypeOf } from '../util/mime.js'
@@ -52,6 +53,8 @@ export interface SiteIndex {
   terms: WxrTerm[]
   attachments: Map<number, IndexedAttachment>
   posts: Map<number, IndexedPost>
+  /** ACF field definitions, and which fields items and terms have values for. */
+  acf: AcfIndex
   issues: WxrParseIssue[]
 }
 
@@ -156,9 +159,11 @@ export const buildSiteIndex = async (file: string | Readable): Promise<SiteIndex
     terms: [],
     attachments: new Map(),
     posts: new Map(),
+    acf: { definitions: [], usage: new Map(), utcOffsets: new Map() },
     issues: [],
   }
   const termKeys = new Set<string>()
+  const acf = new AcfCollector()
   for await (const record of readWxr(file, { onIssue: (i) => index.issues.push(i) })) {
     switch (record.kind) {
       case 'site':
@@ -173,11 +178,13 @@ export const buildSiteIndex = async (file: string | Readable): Promise<SiteIndex
         if (!termKeys.has(key)) {
           termKeys.add(key)
           index.terms.push(record.term)
+          acf.addTerm(record.term)
         }
         break
       }
       case 'item': {
         const { item } = record
+        acf.addItem(item)
         if (item.type === 'attachment') {
           const attachment = indexAttachment(item)
           if (attachment) index.attachments.set(item.id, attachment)
@@ -188,6 +195,7 @@ export const buildSiteIndex = async (file: string | Readable): Promise<SiteIndex
       }
     }
   }
+  index.acf = acf.result()
   return index
 }
 

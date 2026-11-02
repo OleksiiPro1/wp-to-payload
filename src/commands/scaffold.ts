@@ -1,8 +1,12 @@
 import { existsSync } from 'node:fs'
 import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises'
 import { dirname, join, relative, resolve, sep } from 'node:path'
+import { AcfJsonError, loadAcfJson } from '../acf/definitions.js'
+import type { AcfPlan } from '../acf/plan.js'
+import { planSiteAcf } from '../acf/site.js'
 import { type Command, stringOption, UsageError } from '../cli/command.js'
 import { info, out, paint, success, warn } from '../cli/output.js'
+import { ACF_HELP, ACF_OPTIONS, applyAcfOptions } from '../cli/shared.js'
 import { CONFIG_FILE, type CollectionSlugs, type Config, loadConfig } from '../config.js'
 import { findPackageDir } from '../import/project.js'
 import {
@@ -57,6 +61,19 @@ const importPathFrom = (configFile: string, outDir: string): string => {
 }
 
 /**
+ * The slug a collection gets. `slugs` already has the prefix. A custom type may be mapped to one
+ * of these collections, with or without the prefix; every other collection gets the prefix.
+ */
+const prefixer = (slugs: CollectionSlugs, prefix: string) => {
+  const builtin = new Set(Object.values(slugs))
+  return (collection: string) => {
+    const prefixed = `${prefix}${collection}`
+    if (builtin.has(prefixed)) return prefixed
+    return builtin.has(collection) ? collection : prefixed
+  }
+}
+
+/**
  * The custom post types and taxonomies to write collections for. Types mapped to a built-in
  * collection (`postTypes.news.collection: "posts"`) need no file of their own.
  */
@@ -65,14 +82,8 @@ const customCollections = (
   slugs: CollectionSlugs,
   prefix: string,
 ): ScaffoldCustom => {
-  // `slugs` already has the prefix. A custom type may be mapped to one of these collections,
-  // with or without the prefix; every other collection gets the prefix.
   const builtin = new Set(Object.values(slugs))
-  const slugOf = (collection: string) => {
-    const prefixed = `${prefix}${collection}`
-    if (builtin.has(prefixed)) return prefixed
-    return builtin.has(collection) ? collection : prefixed
-  }
+  const slugOf = prefixer(slugs, prefix)
   const taxonomy = new Map(types.taxonomies.map((t) => [t.taxonomy, t]))
   /** Fields for the taxonomies of every type that goes into the collection. */
   const relationsOf = (collection: string, skipBuiltin: boolean): ScaffoldRelation[] => {
@@ -144,7 +155,8 @@ export const scaffoldCommand: Command = {
   name: 'scaffold',
   summary:
     'Write Payload collections for the import: posts, pages, categories, tags, authors, media, and the custom post types and taxonomies of an export.',
-  usage: 'scaffold [export.xml] [--out <dir>] [--slug-prefix <prefix>] [--force]',
+  usage:
+    'scaffold [export.xml] [--out <dir>] [--slug-prefix <prefix>] [--acf-json <path>] [--force]',
   help: [
     [
       'export.xml',
@@ -155,6 +167,7 @@ export const scaffoldCommand: Command = {
       '--slug-prefix <prefix>',
       'Prefix the collection slugs (e.g. wp-) when your project already has posts or pages',
     ],
+    ...ACF_HELP,
     ['--force', 'Overwrite files that already exist'],
     ['--config <file>', `Settings file to read collection slugs from (default: ${CONFIG_FILE})`],
   ],
@@ -163,9 +176,10 @@ export const scaffoldCommand: Command = {
     'slug-prefix': { type: 'string' },
     force: { type: 'boolean' },
     config: { type: 'string' },
+    ...ACF_OPTIONS,
   },
   async run(ctx) {
-    const config = await loadConfig(ctx.cwd, stringOption(ctx, 'config'))
+    const config = applyAcfOptions(ctx, await loadConfig(ctx.cwd, stringOption(ctx, 'config')))
     const prefix = stringOption(ctx, 'slug-prefix') ?? ''
     if (prefix && !/^[a-z][a-z0-9-]*$/.test(prefix)) {
       throw new UsageError('--slug-prefix may only contain lowercase letters, digits and hyphens')
@@ -182,7 +196,24 @@ export const scaffoldCommand: Command = {
     const survey = index ? surveyIndex(index) : EMPTY_SURVEY
     const languages = index ? indexLanguages(index, config) : undefined
     const localization = languages ? localizationOf(languages, config) : undefined
-    const custom = customCollections(resolveSiteTypes(config, survey), slugs, prefix)
+    const types = resolveSiteTypes(config, survey)
+    const custom = customCollections(types, slugs, prefix)
+    let acf: AcfPlan | undefined
+    if (index) {
+      const json = await loadAcfJson(config.acfJson).catch((error: unknown) => {
+        throw error instanceof AcfJsonError ? new UsageError(error.message) : error
+      })
+      acf = planSiteAcf({
+        acf: index.acf,
+        json,
+        config,
+        types,
+        survey,
+        typeOfPost: (id) => index.posts.get(id)?.type,
+        localized: localization !== undefined,
+        slugOf: prefixer(slugs, prefix),
+      })
+    }
     const hasSrc = existsSync(join(ctx.cwd, 'src'))
     const outDir = resolve(
       ctx.cwd,
@@ -218,7 +249,7 @@ export const scaffoldCommand: Command = {
     await mkdir(outDir, { recursive: true })
     const written: string[] = []
     const kept: string[] = []
-    for (const file of scaffoldFiles(slugs, custom, localization)) {
+    for (const file of scaffoldFiles(slugs, custom, localization, acf)) {
       const path = join(outDir, file.name)
       if (existsSync(path) && !ctx.values.force) {
         kept.push(path)
@@ -238,6 +269,31 @@ export const scaffoldCommand: Command = {
     } else if (!exportFile) {
       info(
         'Give the export file (scaffold export.xml) to get collections for its custom types too.',
+      )
+    }
+
+    if (acf && acf.collections.size > 0) {
+      out()
+      out('Custom fields (ACF) in the collections:')
+      for (const plan of acf.collections.values()) {
+        out(`  ${plan.collection}: ${plan.fields.map((f) => f.name).join(', ')}`)
+      }
+      for (const note of acf.notes) {
+        if (note.code === 'ACF_FIELD_RENAMED' || (note.values ?? 0) > 0) info(note.message)
+      }
+      const quiet = acf.notes.filter((n) => n.code === 'ACF_FIELD_SKIPPED' && !n.values).length
+      if (quiet > 0)
+        info(`${quiet} more ACF fields without values are not imported; analyze lists them.`)
+    }
+    if (acf && acf.undefinedValues.length > 0) {
+      warn(
+        `The export has values of ${acf.undefinedValues.length} ACF fields without a definition (${acf.undefinedValues
+          .slice(0, 5)
+          .map((v) => v.name)
+          .join(', ')}${acf.undefinedValues.length > 5 ? ', …' : ''}).`,
+      )
+      warn(
+        "Run scaffold again with --acf-json and the theme's acf-json folder to get their fields.",
       )
     }
 
