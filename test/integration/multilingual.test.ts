@@ -32,6 +32,8 @@ interface Imported {
     images: (number | undefined)[]
     linksDe: string[]
     linksEn: string[]
+    subtitles: string[]
+    wood: string[]
   }
   holiday: { status: string; de: string | null; en: string }
   englishOnly: { de: string | null; en: string }
@@ -142,6 +144,8 @@ describe.skipIf(!projectInstalled())('import of a multilingual Polylang site', (
           images: [benchDe.featuredImage?.id, benchEn.featuredImage?.id],
           linksDe: links(benchDe.content?.root),
           linksEn: links(benchEn.content?.root),
+          subtitles: [benchDe.subtitle, benchEn.subtitle],
+          wood: [benchDe.wood, benchEn.wood],
         },
         holiday: { status: holidayEn._status, de: holidayDe?.title ?? null, en: holidayEn.title },
         englishOnly: { de: onlyEnDe?.title ?? null, en: onlyEnEn.title },
@@ -169,6 +173,9 @@ describe.skipIf(!projectInstalled())('import of a multilingual Polylang site', (
       images: [data.bench.images[0], data.bench.images[0]],
       linksDe: ['/ueber-uns'],
       linksEn: ['/en/about-us'],
+      // ACF values per language.
+      subtitles: ['Aus heimischer Eiche', 'Made of local oak'],
+      wood: ['eiche', 'eiche'],
     })
     expect(data.holiday).toEqual({ status: 'published', de: null, en: 'Summer break' })
     expect(data.englishOnly).toEqual({ de: null, en: 'Visit us in Vienna' })

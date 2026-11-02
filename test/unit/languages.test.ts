@@ -187,10 +187,11 @@ describe('analyze', () => {
       groups: { complete: 5, incomplete: 0 },
       untranslated: 3,
     })
-    expect(r.complexity.reasons.map((x) => x.reason)).toContain(
-      '2 languages (Polylang): each translation group becomes one document with locales',
-    )
-    expect(r.complexity.level).toBe('simple')
+    expect(r.complexity.reasons.map((x) => [x.points, x.reason])).toEqual([
+      [2, '2 languages (Polylang): each translation group becomes one document with locales'],
+      [1, '2 ACF fields become Payload fields (check them after scaffold)'],
+    ])
+    expect(r.complexity.level).toBe('medium')
   })
 })
 
