@@ -9,6 +9,10 @@
 #
 # WP2P_REGISTRY=mirror.gcr.io/library uses a mirror of the official images (Docker Hub limits
 # anonymous pulls).
+#
+# Scenarios name their plugins with versions (`* Plugins: polylang@3.9.1`). They come from
+# wordpress.org; when it cannot be reached, plugins.sh builds the same version from the plugin's
+# official Git repository. WP2P_PLUGIN_SOURCE=wordpress.org or git chooses one explicitly.
 set -euo pipefail
 
 here="$(cd "$(dirname "$0")" && pwd)"
@@ -30,6 +34,15 @@ trap cleanup EXIT
 
 mkdir -p "$target" out
 chmod 777 out
+
+plugin_source="${WP2P_PLUGIN_SOURCE:-auto}"
+if [ "$plugin_source" = auto ]; then
+  if curl -sfI --max-time 15 https://downloads.wordpress.org/ > /dev/null 2>&1; then
+    plugin_source=wordpress.org
+  else
+    plugin_source=git
+  fi
+fi
 
 for scenario in "${scenarios[@]}"; do
   file="scenarios/$scenario.php"
@@ -53,10 +66,21 @@ for scenario in "${scenarios[@]}"; do
   wp rewrite structure '/%year%/%monthnum%/%day%/%postname%/' > /dev/null
   # Start empty: no sample post, page or comment.
   wp site empty --yes > /dev/null
-  if [ -n "$plugins" ]; then
-    # shellcheck disable=SC2086 # the list is meant to split into plugin slugs
-    wp plugin install $plugins --activate
-  fi
+  for entry in ${plugins//,/ }; do
+    slug="${entry%@*}"
+    version="${entry#*@}"
+    if [ "$version" = "$entry" ]; then
+      echo "plugin $slug has no version; write it as $slug@<version>" >&2
+      exit 2
+    fi
+    if [ "$plugin_source" = git ]; then
+      zip="$("$here/plugins.sh" "$slug" "$version")"
+      echo "   $slug $version from its Git repository"
+      wp plugin install "/out/plugins/$(basename "$zip")" --activate > /dev/null
+    else
+      wp plugin install "$slug" --version="$version" --activate > /dev/null
+    fi
+  done
 
   wp eval-file "/fixtures/$file"
 

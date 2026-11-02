@@ -144,6 +144,39 @@ export const renderMarkdown = (r: AnalyzeReport): string => {
     )
   }
 
+  if (r.languages) {
+    const l = r.languages
+    const from = {
+      config: 'from the config',
+      urls: 'its URLs have no language directory',
+      site: "the site's language",
+      first: 'the first language; set localization.defaultLanguage if that is wrong',
+    }[l.defaultFrom]
+    push('## Languages', '')
+    push(
+      `${{ polylang: 'Polylang', wpml: 'WPML (WPML Export and Import)', url: 'Language directories in the URLs' }[l.source]}, ${l.languages.length} languages. Default language: \`${l.defaultLanguage}\` (${from ?? l.defaultFrom}).`,
+      '',
+    )
+    push(
+      ...tableOf(
+        ['Language', 'Name', 'Locale', 'Items'],
+        l.languages.map((x) => [`\`${x.code}\``, x.name ?? '–', x.locale ?? '–', x.items]),
+      ),
+      '',
+    )
+    push(
+      `Translation groups: ${l.groups.complete} in every language, ${l.groups.incomplete} with languages missing; ${l.untranslated} items exist in one language only. On import each group becomes one document with a value per Payload locale.`,
+      '',
+    )
+    if (l.source === 'wpml') push('WPML support is experimental.', '')
+    if (l.source === 'url') {
+      push(
+        'Without the post meta of WPML Export and Import, the language of an item comes from its URL and translations stay separate documents.',
+        '',
+      )
+    }
+  }
+
   push('## Gutenberg blocks', '')
   if (r.content.blocks.length === 0) push('No blocks found.', '')
   else {
@@ -186,8 +219,14 @@ export const renderMarkdown = (r: AnalyzeReport): string => {
         detectionRow('Rank Math', r.seo.rankmath, 'title, description, image → meta'),
         detectionRow('All in One SEO', r.seo.aioseo, 'detected only'),
         detectionRow('SEOPress', r.seo.seopress, 'detected only'),
-        detectionRow('WPML', r.multilingual.wpml, 'detected only'),
-        detectionRow('Polylang', r.multilingual.polylang, 'detected only'),
+        detectionRow(
+          'WPML',
+          r.multilingual.wpml,
+          r.languages?.source === 'wpml'
+            ? 'translations → Payload locales (experimental)'
+            : 'languages from the URLs, translations not linked (needs WPML Export and Import)',
+        ),
+        detectionRow('Polylang', r.multilingual.polylang, 'translations → Payload locales'),
         detectionRow('WooCommerce', r.woocommerce, 'detected only'),
         detectionRow('Advanced Custom Fields', r.acf, 'detected only'),
       ],

@@ -34,6 +34,13 @@ export interface ScaffoldCustom {
   pageRelations: ScaffoldRelation[]
 }
 
+/** Languages of a multilingual site: fields get a value per locale. */
+export interface ScaffoldLocalization {
+  /** Payload locale codes with a label, the default first. */
+  locales: { code: string; label: string }[]
+  defaultLocale: string
+}
+
 export const NO_CUSTOM: ScaffoldCustom = {
   postTypes: [],
   taxonomies: [],
@@ -87,9 +94,11 @@ const documentCollection = (o: {
   hierarchical: boolean
   relations: ScaffoldRelation[]
   wpName?: string
+  /** `, localized: true` on multilingual sites, else empty. */
+  loc: string
 }): string => `${header}import type { CollectionConfig } from 'payload'
 import { wpEditor } from './editor'
-import { slug, wpId } from './fields'
+import { slug, wpId${o.loc ? ', wpIds' : ''} } from './fields'
 ${o.wpName ? `\n/** The WordPress post type "${o.wpName}". */` : ''}
 export const ${o.exportName}: CollectionConfig = {
   slug: ${q(o.slug)},
@@ -99,15 +108,15 @@ export const ${o.exportName}: CollectionConfig = {
   admin: { useAsTitle: 'title', defaultColumns: ['title', 'slug', ${o.hierarchical ? "'parent'" : "'publishedAt'"}, '_status'] },
   versions: { drafts: true },
   fields: [
-    { name: 'title', type: 'text', required: true },
+    { name: 'title', type: 'text', required: true${o.loc} },
 ${
   o.hierarchical
-    ? '    // Not unique: WordPress allows the same slug under different parents.\n    slug(false),'
-    : '    slug(true),'
+    ? `    // Not unique: WordPress allows the same slug under different parents.\n    slug(false${o.loc ? ', true' : ''}),`
+    : `    slug(true${o.loc ? ', true' : ''}),`
 }
-    { name: 'content', type: 'richText', editor: wpEditor },
-    { name: 'excerpt', type: 'textarea' },
-    { name: 'featuredImage', type: 'upload', relationTo: ${q(o.slugs.media)} },
+    { name: 'content', type: 'richText', editor: wpEditor${o.loc} },
+    { name: 'excerpt', type: 'textarea'${o.loc} },
+    { name: 'featuredImage', type: 'upload', relationTo: ${q(o.slugs.media)}${o.loc} },
 ${
   o.hierarchical
     ? `    { name: 'parent', type: 'relationship', relationTo: ${q(o.slug)}, admin: { position: 'sidebar' } },\n`
@@ -115,7 +124,7 @@ ${
 }    { name: 'publishedAt', type: 'date', admin: { position: 'sidebar' } },
     { name: 'author', type: 'relationship', relationTo: ${q(o.slugs.authors)}, admin: { position: 'sidebar' } },
 ${relationFields(o.relations)}    wpId,
-  ],
+${o.loc ? '    wpIds,\n' : ''}  ],
 }
 `
 
@@ -125,30 +134,33 @@ const termCollection = (o: {
   slug: string
   hierarchical: boolean
   wpName?: string
+  loc: string
 }): string => `${header}import type { CollectionConfig } from 'payload'
-import { slug, wpId } from './fields'
+import { slug, wpId${o.loc ? ', wpIds' : ''} } from './fields'
 ${o.wpName ? `\n/** The WordPress taxonomy "${o.wpName}". */` : ''}
 export const ${o.exportName}: CollectionConfig = {
   slug: ${q(o.slug)},
   access: { read: () => true },
   admin: { useAsTitle: 'title', defaultColumns: ['title', 'slug'${o.hierarchical ? ", 'parent'" : ''}] },
   fields: [
-    { name: 'title', type: 'text', required: true },
-    slug(true),
-    { name: 'description', type: 'textarea' },
+    { name: 'title', type: 'text', required: true${o.loc} },
+    slug(true${o.loc ? ', true' : ''}),
+    { name: 'description', type: 'textarea'${o.loc} },
 ${
   o.hierarchical
     ? `    { name: 'parent', type: 'relationship', relationTo: ${q(o.slug)}, admin: { position: 'sidebar' } },\n`
     : ''
 }    wpId,
-  ],
+${o.loc ? '    wpIds,\n' : ''}  ],
 }
 `
 
 export const scaffoldFiles = (
   slugs: CollectionSlugs,
   custom: ScaffoldCustom = NO_CUSTOM,
+  localization?: ScaffoldLocalization,
 ): ScaffoldFile[] => {
+  const loc = localization ? ', localized: true' : ''
   const names = exportNames(custom)
   const nameOf = (slug: string) => names.get(slug) ?? slug
   const taxonomyNames = custom.taxonomies.map((t) => nameOf(t.slug))
@@ -171,15 +183,32 @@ export const wpId: Field = {
   },
 }
 
-export const slug = (unique: boolean): Field => ({
+export const slug = (unique: boolean${loc ? ', localized = false' : ''}): Field => ({
   name: 'slug',
   type: 'text',
   required: true,
   index: true,
-  unique,
+  unique,${loc ? '\n  // Unique per locale: each language version has a slug of its own.\n  localized,' : ''}
   admin: { position: 'sidebar' },
 })
-`,
+${
+  loc
+    ? `
+/** The WordPress IDs of all language versions of a translated document. */
+export const wpIds: Field = {
+  name: 'wpIds',
+  type: 'number',
+  hasMany: true,
+  index: true,
+  admin: {
+    position: 'sidebar',
+    readOnly: true,
+    description: 'WordPress IDs of all languages, set by wp-to-payload',
+  },
+}
+`
+    : ''
+}`,
     },
     {
       name: 'editor.ts',
@@ -214,16 +243,16 @@ export const wpEditor = lexicalEditor({
     {
       name: 'Media.ts',
       content: `${header}import type { CollectionConfig } from 'payload'
-import { wpId } from './fields'
+import { wpId${loc ? ', wpIds' : ''} } from './fields'
 
 export const Media: CollectionConfig = {
   slug: ${q(slugs.media)},
   access: { read: () => true },
   upload: true,
   fields: [
-    { name: 'alt', type: 'text', required: true },
-    { name: 'caption', type: 'textarea' },
-    wpId,
+    { name: 'alt', type: 'text', required: true${loc} },
+    { name: 'caption', type: 'textarea'${loc} },
+    wpId,${loc ? '\n    wpIds,' : ''}
   ],
 }
 `,
@@ -234,11 +263,12 @@ export const Media: CollectionConfig = {
         exportName: 'Categories',
         slug: slugs.categories,
         hierarchical: true,
+        loc,
       }),
     },
     {
       name: 'Tags.ts',
-      content: termCollection({ exportName: 'Tags', slug: slugs.tags, hierarchical: false }),
+      content: termCollection({ exportName: 'Tags', slug: slugs.tags, hierarchical: false, loc }),
     },
     ...custom.taxonomies.map((t) => ({
       name: `${nameOf(t.slug)}.ts`,
@@ -247,6 +277,7 @@ export const Media: CollectionConfig = {
         slug: t.slug,
         hierarchical: t.hierarchical,
         wpName: t.wpName,
+        loc,
       }),
     })),
     {
@@ -282,6 +313,7 @@ export const Authors: CollectionConfig = {
           { field: 'tags', collection: slugs.tags },
           ...custom.postRelations,
         ],
+        loc,
       }),
     },
     {
@@ -292,6 +324,7 @@ export const Authors: CollectionConfig = {
         slugs,
         hierarchical: true,
         relations: custom.pageRelations,
+        loc,
       }),
     },
     ...custom.postTypes.map((t) => ({
@@ -303,6 +336,7 @@ export const Authors: CollectionConfig = {
         hierarchical: t.hierarchical,
         relations: t.relations,
         wpName: t.wpName,
+        loc,
       }),
     })),
     {
@@ -342,16 +376,27 @@ export const configSnippet = (
   slugs: CollectionSlugs,
   importPath: string,
   custom: ScaffoldCustom = NO_CUSTOM,
+  localization?: ScaffoldLocalization,
 ): string => {
   const documents = [slugs.posts, slugs.pages, ...custom.postTypes.map((t) => t.slug)]
     .map(q)
     .join(', ')
+  const locales = localization
+    ? `
+  localization: {
+    locales: [
+${localization.locales.map((l) => `      { label: ${q(l.label)}, code: ${q(l.code)} },`).join('\n')}
+    ],
+    defaultLocale: ${q(localization.defaultLocale)},
+    fallback: true,
+  },`
+    : ''
   return `import { seoPlugin } from '@payloadcms/plugin-seo'
 import { redirectsPlugin } from '@payloadcms/plugin-redirects'
 import { wpCollections } from '${importPath}'
 
 export default buildConfig({
-  collections: [...wpCollections /* , your other collections */],
+  collections: [...wpCollections /* , your other collections */],${locales}
   plugins: [
     seoPlugin({ collections: [${documents}], uploadsCollection: ${q(slugs.media)} }),
     redirectsPlugin({ collections: [${documents}] }),

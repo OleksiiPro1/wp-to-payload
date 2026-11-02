@@ -54,6 +54,21 @@ export interface CustomTaxonomy {
   reason?: string
 }
 
+/** The languages of a multilingual site and how complete its translations are. */
+export interface LanguagesReport {
+  /** Where the languages come from: Polylang, WPML Export and Import, or URL directories. */
+  source: 'polylang' | 'wpml' | 'url'
+  defaultLanguage: string
+  /** How the default language was found: config, urls (no language directory), site, first. */
+  defaultFrom: string
+  /** Content items (no images or menus) per language, any status but trash. */
+  languages: { code: string; locale?: string; name?: string; items: number }[]
+  /** Translation groups with every language, and with some missing. */
+  groups: { complete: number; incomplete: number }
+  /** Content items without a translation. */
+  untranslated: number
+}
+
 export interface ComplexityReason {
   points: number
   reason: string
@@ -85,6 +100,8 @@ export interface AnalyzeReport {
     customPostTypes: Record<string, number>
   }
   customTypes: { postTypes: CustomPostType[]; taxonomies: CustomTaxonomy[] }
+  /** Only for multilingual sites. */
+  languages?: LanguagesReport
   content: {
     gutenbergItems: number
     classicItems: number

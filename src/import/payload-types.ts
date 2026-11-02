@@ -52,6 +52,8 @@ interface WriteArgs {
   overrideAccess?: boolean
   context?: Record<string, unknown>
   file?: UploadFile
+  /** Locale of the localized fields in `data`. */
+  locale?: string
 }
 
 export interface PayloadLike {

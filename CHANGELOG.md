@@ -8,6 +8,16 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- Multilingual sites. Polylang's languages and translation groups, and WPML's through the post
+  meta of its WPML Export and Import add-on (experimental), become Payload localization: one
+  document per translation group with title, slug, content, excerpt, featured image, SEO fields,
+  term texts and media texts per locale; `wpIds` holds the WordPress IDs of all versions, so
+  repeated imports and later translations update the same document. URLs keep a language
+  directory except for the default language (`:locale` token), every language's old URLs are
+  redirected, `scaffold` writes localized collections and prints the `localization` block, and
+  `analyze` shows the languages, items per language and the completeness of translations. New
+  setting `localization`; new warning codes `LANGUAGE_SKIPPED`, `TRANSLATION_DRAFT` and
+  `FIELD_NOT_LOCALIZED`.
 - Custom post types and custom taxonomies. `analyze` lists them with what the import does with
   each. `scaffold export.xml` writes a collection for each (`recipe` → `recipes`,
   `recipe_category` → `recipe-categories`) with the fields of posts or categories, a parent for
@@ -36,6 +46,8 @@ All notable changes to this project are documented here. The format follows
 
 ### Development
 
+- A German and English fixture site with Polylang 3.9.1. When wordpress.org cannot be reached,
+  the fixture generator builds plugins from their official Git repositories.
 - Test fixtures from real WordPress 7.1 sites, built in Docker by `scripts/fixtures` and
   exported with both WordPress's exporter and WP-CLI. The `core` site has a custom post type
   with a hierarchical taxonomy and a hierarchical custom post type.

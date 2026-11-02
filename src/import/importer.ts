@@ -3,20 +3,15 @@ import { MediaMatcher } from '../content/media-match.js'
 import { prepareContent } from '../content/pipeline.js'
 import type { ContentContext } from '../content/types.js'
 import type { Config } from '../config.js'
-import { SiteUrls } from '../paths/site-urls.js'
 import { buildRedirects } from '../redirects/build.js'
 import { type Warning, WarningCollector } from '../report/warnings.js'
 import { extractSeo } from '../seo/seo.js'
-import {
-  type PostTypeTarget,
-  resolveSiteTypes,
-  siteUrlsOptions,
-  surveyIndex,
-  type TaxonomyTarget,
-} from '../site-types.js'
+import { translationsOf, termTranslationsOf } from '../languages.js'
+import { describeSite } from '../site.js'
+import type { PostTypeTarget, TaxonomyTarget } from '../site-types.js'
 import { decodeEntities } from '../util/entities.js'
 import { slugify } from '../util/slug.js'
-import { metaValue, type WxrItem, type WxrTerm } from '../wxr/model.js'
+import { metaValue, type WxrItem, type WxrItemTerm, type WxrTerm } from '../wxr/model.js'
 import { readWxr } from '../wxr/reader.js'
 import {
   buildSiteIndex,
@@ -25,6 +20,7 @@ import {
   type SiteIndex,
 } from '../wxr/site-index.js'
 import { htmlToLexical, isEmptyState } from './lexical.js'
+import { importLocales } from './locales.js'
 import { type Phase, phaseLabel, PHASES } from './phases.js'
 import { MediaSource } from './media.js'
 import type {
@@ -165,7 +161,51 @@ export const importExport = async (
       `${index.issues.length} XML errors in the export were skipped; run analyze for details.`,
     )
   }
-  const types = resolveSiteTypes(config, surveyIndex(index))
+  const { types, languages, urls } = describeSite(index, config)
+  const locales = languages ? importLocales(languages, config, payload.config) : undefined
+  if (languages && locales) {
+    log(
+      `Languages: ${languages.languages.map((l) => l.code).join(', ')}, default ${languages.defaultLanguage} (${languages.source})`,
+    )
+    for (const [language, reason] of locales.skipped) {
+      let items = 0
+      for (const [id, l] of languages.itemLanguage) {
+        const post = index.posts.get(id)
+        if (l === language && post && IMPORTED_STATUSES.has(post.status)) items++
+      }
+      let terms = 0
+      for (const l of languages.termLanguage.values()) if (l === language) terms++
+      warnings
+        .for({})
+        .add(
+          'LANGUAGE_SKIPPED',
+          `${items} items and ${terms} terms in ${language} were not imported: ${reason}.`,
+          language,
+        )
+    }
+  }
+  /** The Payload locale of an item: a code, null without localization, undefined to skip it. */
+  const localeOfItem = (id: number): string | null | undefined =>
+    languages && locales
+      ? locales.localeOf(languages.itemLanguage.get(id) ?? languages.defaultLanguage)
+      : null
+  const localeOfTerm = (id: number | undefined): string | null | undefined =>
+    languages && locales
+      ? locales.localeOf(
+          (id === undefined ? undefined : languages.termLanguage.get(id)) ??
+            languages.defaultLanguage,
+        )
+      : null
+  /** An item and its translations, which become one document. */
+  const unitOf = (id: number): number[] =>
+    languages ? [...translationsOf(languages, id).values()] : [id]
+  const termUnitOf = (id: number): number[] =>
+    languages ? [...termTranslationsOf(languages, id).values()] : [id]
+  /** Whether an ID is the default language's member of its unit (or the first one). */
+  const primaryOf = (ids: number[], languageOf: (id: number) => string | undefined): number => {
+    const own = ids.find((id) => languageOf(id) === languages?.defaultLanguage)
+    return own ?? Math.min(...ids)
+  }
   // Every step and the collection it writes to, in the order the steps run.
   const phaseCollection = new Map<Phase, string>([
     ['media', slugs.media],
@@ -187,7 +227,6 @@ export const importExport = async (
     warnings: [],
     durationMs: 0,
   }
-  const urls = new SiteUrls(index, siteUrlsOptions(config, types))
   const matcher = new MediaMatcher(index.attachments)
   const attachmentsByParent = new Map<number, IndexedAttachment[]>()
   for (const a of index.attachments.values()) {
@@ -312,18 +351,23 @@ export const importExport = async (
     const map = new Map<number, DocId>()
     const schema = schemaOf(slug)
     if (schema?.has(f.wpId)) {
+      const withIds = schema.has(f.wpIds)
       const found = await payload.find({
         collection: slug,
         where: { [f.wpId]: { exists: true } },
         pagination: false,
         depth: 0,
         draft: schema.hasDrafts,
-        select: { [f.wpId]: true },
+        select: { [f.wpId]: true, ...(withIds ? { [f.wpIds]: true } : {}) },
         overrideAccess: true,
       })
       for (const doc of found.docs) {
-        const wpId = Number(doc[f.wpId])
-        if (Number.isFinite(wpId) && !map.has(wpId)) map.set(wpId, doc.id)
+        // A translated document carries the IDs of all its language versions.
+        const all = Array.isArray(doc[f.wpIds]) ? (doc[f.wpIds] as unknown[]) : []
+        for (const value of [doc[f.wpId], ...all]) {
+          const wpId = Number(value)
+          if (Number.isFinite(wpId) && !map.has(wpId)) map.set(wpId, doc.id)
+        }
       }
     }
     existing.set(slug, map)
@@ -359,7 +403,12 @@ export const importExport = async (
       ? (await loadExisting(schema.slug)).get(key)
       : findBySlug(schema, key.slug)
 
-  /** Creates or updates the document with this WordPress ID (or slug). Returns its Payload ID. */
+  /** Documents written in this run, so a document in several languages counts once. */
+  const touched = new Set<string>()
+  /**
+   * Creates or updates the document with this WordPress ID (or slug), or with any ID of `unit`
+   * (the language versions of a translated document). Returns its Payload ID.
+   */
   const upsert = async (
     phase: Phase,
     schema: CollectionSchema,
@@ -369,17 +418,30 @@ export const importExport = async (
       draft?: boolean
       file?: Parameters<PayloadLike['create']>[0]['file']
       onWritten?: (doc: PayloadDoc) => void
+      /** The Payload locale to write; null or absent for none. */
+      locale?: string | null
+      unit?: number[]
     } = {},
   ): Promise<DocId | undefined> => {
     const stats = (result.phases[phase] ??= emptyPhase())
     const { data, missing } = schema.filter(raw)
     reportMissing(schema.slug, missing)
-    const id = await existingId(schema, key)
+    let id = await existingId(schema, key)
+    const known = await loadExisting(schema.slug)
+    for (const n of extra.unit ?? []) id ??= known.get(n)
     const wpId = typeof key === 'number' ? key : undefined
+    const count = (docId: DocId, created: boolean) => {
+      const mark = `${schema.slug}:${docId}`
+      if (created) stats.created++
+      else if (!touched.has(mark)) stats.updated++
+      touched.add(mark)
+      for (const n of extra.unit ?? []) known.set(n, docId)
+    }
     if (options.dryRun) {
-      if (id === undefined) stats.created++
-      else stats.updated++
-      return id ?? `dry-run-${typeof key === 'number' ? key : key.slug}`
+      const docId = id ?? `dry-run-${typeof key === 'number' ? key : key.slug}`
+      count(docId, id === undefined)
+      if (typeof key === 'number') known.set(key, docId)
+      return docId
     }
     try {
       const args = {
@@ -390,16 +452,17 @@ export const importExport = async (
         context: WRITE_CONTEXT,
         ...(extra.draft !== undefined && schema.hasDrafts ? { draft: extra.draft } : {}),
         ...(extra.file ? { file: extra.file } : {}),
+        ...(extra.locale ? { locale: extra.locale } : {}),
       }
       let doc: PayloadDoc
       if (id === undefined) {
         doc = await payload.create(args)
-        if (typeof key === 'number') (await loadExisting(schema.slug)).set(key, doc.id)
+        if (typeof key === 'number') known.set(key, doc.id)
         else bySlug.get(schema.slug)?.set(key.slug, doc.id)
-        stats.created++
+        count(doc.id, true)
       } else {
         doc = await payload.update({ ...args, id })
-        stats.updated++
+        count(doc.id, false)
       }
       extra.onWritten?.(doc)
       return doc.id
@@ -413,6 +476,26 @@ export const importExport = async (
       return id
     }
   }
+
+  const notLocalized = new Set<string>()
+  /** Translations of fields that are not localized in Payload are lost; say so once per field. */
+  const reportNotLocalized = (collection: string, fields: string[]) => {
+    for (const field of fields) {
+      const key = `${collection}.${field}`
+      if (notLocalized.has(key)) continue
+      notLocalized.add(key)
+      warnings.add(
+        'FIELD_NOT_LOCALIZED',
+        `Field "${field}" of collection "${collection}" is not localized; only the ${languages?.defaultLanguage ?? 'default'} version of it was imported.`,
+        key,
+      )
+    }
+  }
+  /** Data for a document's ID fields: the smallest WordPress ID and all IDs of its languages. */
+  const idFields = (schema: CollectionSchema, unit: number[]): Record<string, unknown> => ({
+    [f.wpId]: Math.min(...unit),
+    ...(languages && schema.has(f.wpIds) ? { [f.wpIds]: [...unit].sort((a, b) => a - b) } : {}),
+  })
 
   const progress = (phase: Phase, done: number, total: number) => {
     if (done === total || done % 50 === 0) log(`  ${phase}: ${done}/${total}`)
@@ -449,7 +532,14 @@ export const importExport = async (
       retries: 2,
       ...(options.fetchImpl ? { fetchImpl: options.fetchImpl } : {}),
     })
-    const attachments = [...index.attachments.values()]
+    // Translated images (Polylang's media translation) are one file with texts per language:
+    // one version is uploaded, the others add their alt text and caption in their locale.
+    const languageOf = (id: number) => languages?.itemLanguage.get(id)
+    const importable = [...index.attachments.values()].filter(
+      (a) => localeOfItem(a.id) !== undefined,
+    )
+    const attachments = importable.filter((a) => primaryOf(unitOf(a.id), languageOf) === a.id)
+    const translated = importable.filter((a) => !attachments.includes(a))
     log(`Media: ${attachments.length} files`)
     let done = 0
     for (let i = 0; i < attachments.length; i += options.concurrency) {
@@ -462,10 +552,11 @@ export const importExport = async (
       )
       for (const [n, a] of batch.entries()) {
         const fileResult = files[n]
+        const unit = unitOf(a.id)
         const data = {
           alt: a.alt || decodeEntities(a.title) || a.filename,
           caption: a.caption ? plainText(a.caption) : undefined,
-          [f.wpId]: a.id,
+          ...idFields(schema, unit),
         }
         const media = warnings.for({ wpId: a.id, wpType: 'attachment' })
         if (fileResult && !fileResult.ok) {
@@ -476,19 +567,37 @@ export const importExport = async (
             ;(result.phases.media ??= emptyPhase()).failed++
             media.add('MEDIA_FAILED', `${a.url} not imported: ${fileResult.reason}`, a.url)
           }
-          const kept = ids.get(a.id)
+          const kept = unit.map((n) => ids.get(n)).find((d) => d !== undefined)
           if (kept !== undefined) mediaIds.set(a.id, kept)
         } else {
-          const id = await upsert('media', schema, a.id, data, {
+          const id = await upsert('media', schema, Math.min(...unit), data, {
             ...(fileResult?.ok ? { file: fileResult.file } : {}),
             onWritten: (doc) => {
               if (typeof doc.url === 'string') mediaUrls.set(a.id, doc.url)
             },
+            locale: localeOfItem(a.id) ?? null,
+            unit,
           })
           if (id !== undefined) mediaIds.set(a.id, id)
         }
         progress('media', ++done, attachments.length)
       }
+    }
+    for (const a of translated) {
+      const unit = unitOf(a.id)
+      const doc = unit.map((n) => mediaIds.get(n)).find((d) => d !== undefined)
+      if (doc === undefined) continue
+      mediaIds.set(a.id, doc)
+      const url = unit.map((n) => mediaUrls.get(n)).find(Boolean)
+      if (url) mediaUrls.set(a.id, url)
+      const locale = localeOfItem(a.id)
+      const { data, dropped } = schema.localizedPart({
+        alt: a.alt || decodeEntities(a.title) || a.filename,
+        caption: a.caption ? plainText(a.caption) : undefined,
+      })
+      reportNotLocalized(schema.slug, dropped)
+      if (!locale || Object.keys(data).length === 0) continue
+      await upsert('media', schema, Math.min(...unit), data, { locale, unit })
     }
   } else if (schemaOf(slugs.media)?.has(f.wpId)) {
     for (const [wpId, id] of await loadExisting(slugs.media)) mediaIds.set(wpId, id)
@@ -516,24 +625,44 @@ export const importExport = async (
       }
       return
     }
-    log(`${phaseLabel(phase)}: ${terms.length}`)
+    // Translations of a term become one document with a title, slug and description per locale.
+    const importable = sortByParent(terms).filter((t) => localeOfTerm(t.id) !== undefined)
+    const languageOf = (id: number) => languages?.termLanguage.get(id)
+    const isPrimary = (term: WxrTerm) =>
+      term.id === undefined || primaryOf(termUnitOf(term.id), languageOf) === term.id
+    log(`${phaseLabel(phase)}: ${importable.filter(isPrimary).length}`)
     let done = 0
-    for (const term of sortByParent(terms)) {
+    // Primary versions first, so their documents exist when the translations are added.
+    for (const term of [
+      ...importable.filter(isPrimary),
+      ...importable.filter((t) => !isPrimary(t)),
+    ]) {
       done++
-      const key = keyOf(term)
+      const unit = term.id === undefined ? [] : termUnitOf(term.id)
+      const key = unit.length > 1 ? Math.min(...unit) : keyOf(term)
       const parentId = term.parentSlug ? termIds.get(termKey(taxonomy, term.parentSlug)) : undefined
-      const data: Record<string, unknown> = {
+      let data: Record<string, unknown> = {
         title: term.name,
         slug: term.slug,
         description: term.description,
-        [f.wpId]: typeof key === 'number' ? key : undefined,
       }
-      if (parentId !== undefined && schema.relatesTo('parent', slug)) {
-        data.parent = schema.relationValue('parent', slug, [parentId])
+      if (isPrimary(term)) {
+        if (parentId !== undefined && schema.relatesTo('parent', slug)) {
+          data.parent = schema.relationValue('parent', slug, [parentId])
+        }
+      } else {
+        const part = schema.localizedPart(data)
+        reportNotLocalized(schema.slug, part.dropped)
+        data = part.data
       }
-      const id = await upsert(phase, schema, key, data)
+      if (typeof key === 'number')
+        Object.assign(data, idFields(schema, unit.length > 0 ? unit : [key]))
+      const id = await upsert(phase, schema, key, data, {
+        locale: localeOfTerm(term.id) ?? null,
+        unit,
+      })
       if (id !== undefined) termIds.set(termKey(taxonomy, term.slug), id)
-      progress(phase, done, terms.length)
+      progress(phase, done, importable.length)
     }
   }
   for (const taxonomy of types.taxonomies) await importTerms(taxonomy)
@@ -581,15 +710,60 @@ export const importExport = async (
     return entry
   }
 
-  // Duplicate slugs within a collection of a non-hierarchical type (possible for drafts) get
-  // the WordPress ID appended.
+  /**
+   * How an item is imported: with its translations into one document, whose WordPress ID is the
+   * smallest of them. The document is published when one version is public; versions that are
+   * not public then stay out, or they would become public in Payload.
+   */
+  interface UnitPlan {
+    key: number
+    unit: number[]
+    primary: number
+    published: boolean
+    members: Set<number>
+  }
+  const plans = new Map<number, UnitPlan>()
+  const languageOfItem = (id: number) => languages?.itemLanguage.get(id)
+  const planOf = (id: number): UnitPlan => {
+    const cached = plans.get(id)
+    if (cached) return cached
+    const unit = unitOf(id).filter((n) => index.posts.has(n))
+    if (!unit.includes(id)) unit.push(id)
+    const candidates = unit.filter((n) => {
+      const post = index.posts.get(n)
+      return (
+        post !== undefined &&
+        IMPORTED_STATUSES.has(post.status) &&
+        typeOf.has(post.type) &&
+        localeOfItem(n) !== undefined
+      )
+    })
+    const isPublic = (n: number) => {
+      const post = index.posts.get(n)
+      return post?.status === 'publish' && !post.hasPassword
+    }
+    const published = candidates.some(isPublic)
+    const members = published ? candidates.filter(isPublic) : candidates
+    const plan: UnitPlan = {
+      key: Math.min(...unit),
+      unit,
+      primary: members.length > 0 ? primaryOf(members, languageOfItem) : id,
+      published,
+      members: new Set(members),
+    }
+    for (const n of unit) plans.set(n, plan)
+    return plan
+  }
+
+  // Duplicate slugs within a collection and language of a non-hierarchical type (possible for
+  // drafts) get the WordPress ID appended.
   const uniqueSlugs = new Map<number, string>()
   {
     const seen = new Map<string, IndexedPost>()
     for (const post of index.posts.values()) {
       const type = typeOf.get(post.type)
       if (!type || type.hierarchical || !IMPORTED_STATUSES.has(post.status)) continue
-      const key = `${type.collection}:${post.slug}`
+      const key = `${type.collection}:${languageOfItem(post.id) ?? ''}:${post.slug}`
       const other = seen.get(key)
       if (other === undefined) {
         seen.set(key, post)
@@ -606,15 +780,20 @@ export const importExport = async (
     }
   }
 
-  const termIdsOf = (item: WxrItem, taxonomy: string): DocId[] =>
-    item.terms
-      .filter((t) => t.taxonomy === taxonomy)
-      .map((t) => termIds.get(termKey(taxonomy, t.slug)))
-      .filter((id): id is DocId => id !== undefined)
+  /** Term documents of the item, for all versions of a translated document. */
+  const termIdsOf = (terms: WxrItemTerm[], taxonomy: string): DocId[] => [
+    ...new Set(
+      terms
+        .filter((t) => t.taxonomy === taxonomy)
+        .map((t) => termIds.get(termKey(taxonomy, t.slug)))
+        .filter((id): id is DocId => id !== undefined),
+    ),
+  ]
 
   const buildDocument = (
     item: WxrItem,
     schema: CollectionSchema,
+    plan: UnitPlan = planOf(item.id),
   ): { data: Record<string, unknown>; draft: boolean } => {
     const itemWarnings = warnings.for({ wpId: item.id, wpType: item.type })
     const published = item.status === 'publish' && !item.hasPassword
@@ -630,8 +809,8 @@ export const importExport = async (
       [f.slug]: uniqueSlugs.get(item.id) ?? index.posts.get(item.id)?.slug,
       [f.excerpt]: plainText(item.excerpt) || undefined,
       [f.publishedAt]: toIso(item.postDateGmt) ?? toIso(item.postDate),
-      [f.wpId]: item.id,
-      _status: published ? 'published' : 'draft',
+      ...idFields(schema, plan.unit),
+      _status: (languages ? plan.published : published) ? 'published' : 'draft',
     }
 
     const editor = editorFor(schema)
@@ -664,8 +843,12 @@ export const importExport = async (
     if (authorId !== undefined && schema.relatesTo(f.author, slugs.authors)) {
       data[f.author] = schema.relationValue(f.author, slugs.authors, [authorId])
     }
+    const terms = [
+      ...item.terms,
+      ...[...plan.members].flatMap((n) => (n === item.id ? [] : (index.posts.get(n)?.terms ?? []))),
+    ]
     for (const taxonomy of types.taxonomies) {
-      const ids = termIdsOf(item, taxonomy.taxonomy)
+      const ids = termIdsOf(terms, taxonomy.taxonomy)
       if (ids.length === 0) continue
       // Collections designed by hand may name the field differently; any relationship to the
       // taxonomy's collection will do for custom taxonomies.
@@ -709,7 +892,20 @@ export const importExport = async (
     }
     if (seo.noindex && schema.subField(f.meta, 'noIndex')) meta.noIndex = true
     if (Object.keys(meta).length > 0) data[f.meta] = meta
-    return { data, draft: !published }
+    if (item.id !== plan.primary) {
+      // A translation: only what Payload keeps per locale, plus the IDs and the status.
+      const part = schema.localizedPart(data)
+      const translatable = new Set([f.title, f.slug, f.content, f.excerpt, f.featuredImage, f.meta])
+      reportNotLocalized(
+        schema.slug,
+        part.dropped.filter((k) => translatable.has(k)),
+      )
+      return {
+        data: { ...part.data, ...idFields(schema, plan.unit), _status: data._status },
+        draft: data._status !== 'published',
+      }
+    }
+    return { data, draft: data._status !== 'published' }
   }
 
   const selectedTypes = types.postTypes.filter((t) => selected.has(t.phase))
@@ -739,13 +935,26 @@ export const importExport = async (
       const { item } = record
       const type = typeOf.get(item.type)
       if (!type || !selected.has(type.phase) || !IMPORTED_STATUSES.has(item.status)) continue
+      const plan = planOf(item.id)
+      if (!plan.members.has(item.id)) {
+        if (localeOfItem(item.id) !== undefined) {
+          warnings
+            .for({ wpId: item.id, wpType: item.type })
+            .add(
+              'TRANSLATION_DRAFT',
+              `The ${languageOfItem(item.id) ?? ''} version is not public in WordPress (${item.hasPassword ? 'password protected' : item.status}), but another language version is; it was not imported, so it does not become public.`,
+              String(plan.key),
+            )
+        }
+        continue
+      }
       const count = written.get(type.wpType) ?? 0
       if (options.limit !== undefined && count >= options.limit) continue
       written.set(type.wpType, count + 1)
       const schema = schemaOf(type.collection) as CollectionSchema
       let built: ReturnType<typeof buildDocument>
       try {
-        built = buildDocument(item, schema)
+        built = buildDocument(item, schema, plan)
       } catch (error) {
         ;(result.phases[type.phase] ??= emptyPhase()).failed++
         result.errors.push({
@@ -755,9 +964,17 @@ export const importExport = async (
         })
         continue
       }
-      const id = await upsert(type.phase, schema, item.id, built.data, { draft: built.draft })
-      if (id !== undefined) docIds.set(item.id, { collection: schema.slug, id })
-      if (type.hierarchical) statusOf.set(item.id, String(built.data._status))
+      const id = await upsert(type.phase, schema, plan.key, built.data, {
+        draft: built.draft,
+        locale: localeOfItem(item.id) ?? null,
+        unit: plan.unit,
+      })
+      if (id !== undefined) {
+        for (const n of plan.unit) docIds.set(n, { collection: schema.slug, id })
+      }
+      if (type.hierarchical && item.id === plan.primary) {
+        statusOf.set(item.id, String(built.data._status))
+      }
       progress(type.phase, count + 1, totalOf(type))
     }
 
@@ -836,8 +1053,13 @@ export const importExport = async (
     for (const r of map.redirects) {
       done++
       const doc = r.wpId === undefined ? undefined : docIds.get(r.wpId)
+      // The plugin's references cannot name a locale, so other languages get their URL.
+      const inDefaultLanguage =
+        !languages ||
+        r.wpId === undefined ||
+        (languageOfItem(r.wpId) ?? languages.defaultLanguage) === languages.defaultLanguage
       const to =
-        doc && referenceTargets.has(doc.collection)
+        doc && inDefaultLanguage && referenceTargets.has(doc.collection)
           ? { type: 'reference', reference: { relationTo: doc.collection, value: doc.id } }
           : { type: 'custom', url: r.to }
       const data: Record<string, unknown> = { from: r.from, to }

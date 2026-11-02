@@ -13,6 +13,8 @@ const attachment = (over: Partial<IndexedAttachment> = {}): IndexedAttachment =>
   mimeType: 'image/png',
   title: 'A',
   parentId: 0,
+  link: 'https://site.example.com/a/',
+  terms: [],
   ...over,
 })
 

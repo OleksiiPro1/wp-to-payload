@@ -108,7 +108,9 @@ export const buildRedirects = (index: SiteIndex, urls: SiteUrls): RedirectMap =>
     if (!archive || target === undefined) continue
     const oldSlug = archive.nested ? urls.termTree(term.taxonomy, term.slug) : term.slug
     add({
-      from: encodeOld(`${sitePath}/${archive.base}/${oldSlug}/`),
+      from: encodeOld(
+        `${sitePath}${urls.oldTermPrefix(term.taxonomy, term.slug)}/${archive.base}/${oldSlug}/`,
+      ),
       to: encodePath(target),
       status: 301,
       kind:

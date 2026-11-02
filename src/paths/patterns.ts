@@ -1,8 +1,9 @@
 /**
  * New URL path per WordPress type. Tokens: `:slug`, `:path` (slugs of parent pages joined with
- * `/`), `:id`, `:year`, `:month`, `:day`, `:category` (first category with its parents) and
- * `:type`. Types without a pattern get no new URL, so links to them are kept and no redirect is
- * written.
+ * `/`), `:id`, `:year`, `:month`, `:day`, `:category` (first category with its parents),
+ * `:type` and `:locale` (the language directory on multilingual sites, empty for the default
+ * language). Types without a pattern get no new URL, so links to them are kept and no redirect
+ * is written.
  */
 export type PathPatterns = Record<string, string>
 
@@ -12,7 +13,17 @@ export const DEFAULT_PATTERNS: PathPatterns = {
   page: '/:slug',
 }
 
-export const TOKENS = ['slug', 'path', 'id', 'year', 'month', 'day', 'category', 'type'] as const
+export const TOKENS = [
+  'slug',
+  'path',
+  'id',
+  'year',
+  'month',
+  'day',
+  'category',
+  'type',
+  'locale',
+] as const
 export type Token = (typeof TOKENS)[number]
 
 export const validatePattern = (pattern: string): string | undefined => {
