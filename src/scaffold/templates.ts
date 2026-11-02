@@ -1,4 +1,6 @@
+import type { AcfCollectionPlan, AcfPlan } from '../acf/plan.js'
 import type { CollectionSlugs } from '../config.js'
+import { acfFieldLines, needsEditor } from './acf-fields.js'
 
 /** Collection files written by `scaffold`. They belong to the user's project afterwards. */
 export interface ScaffoldFile {
@@ -96,6 +98,7 @@ const documentCollection = (o: {
   wpName?: string
   /** `, localized: true` on multilingual sites, else empty. */
   loc: string
+  acf?: AcfCollectionPlan
 }): string => `${header}import type { CollectionConfig } from 'payload'
 import { wpEditor } from './editor'
 import { slug, wpId${o.loc ? ', wpIds' : ''} } from './fields'
@@ -123,7 +126,7 @@ ${
     : ''
 }    { name: 'publishedAt', type: 'date', admin: { position: 'sidebar' } },
     { name: 'author', type: 'relationship', relationTo: ${q(o.slugs.authors)}, admin: { position: 'sidebar' } },
-${relationFields(o.relations)}    wpId,
+${relationFields(o.relations)}${acfFieldLines(o.acf)}    wpId,
 ${o.loc ? '    wpIds,\n' : ''}  ],
 }
 `
@@ -135,8 +138,9 @@ const termCollection = (o: {
   hierarchical: boolean
   wpName?: string
   loc: string
+  acf?: AcfCollectionPlan
 }): string => `${header}import type { CollectionConfig } from 'payload'
-import { slug, wpId${o.loc ? ', wpIds' : ''} } from './fields'
+${o.acf && needsEditor(o.acf.fields) ? "import { wpEditor } from './editor'\n" : ''}import { slug, wpId${o.loc ? ', wpIds' : ''} } from './fields'
 ${o.wpName ? `\n/** The WordPress taxonomy "${o.wpName}". */` : ''}
 export const ${o.exportName}: CollectionConfig = {
   slug: ${q(o.slug)},
@@ -150,7 +154,7 @@ ${
   o.hierarchical
     ? `    { name: 'parent', type: 'relationship', relationTo: ${q(o.slug)}, admin: { position: 'sidebar' } },\n`
     : ''
-}    wpId,
+}${acfFieldLines(o.acf)}    wpId,
 ${o.loc ? '    wpIds,\n' : ''}  ],
 }
 `
@@ -159,8 +163,10 @@ export const scaffoldFiles = (
   slugs: CollectionSlugs,
   custom: ScaffoldCustom = NO_CUSTOM,
   localization?: ScaffoldLocalization,
+  acf?: AcfPlan,
 ): ScaffoldFile[] => {
   const loc = localization ? ', localized: true' : ''
+  const acfOf = (slug: string) => acf?.collections.get(slug)
   const names = exportNames(custom)
   const nameOf = (slug: string) => names.get(slug) ?? slug
   const taxonomyNames = custom.taxonomies.map((t) => nameOf(t.slug))
@@ -264,11 +270,18 @@ export const Media: CollectionConfig = {
         slug: slugs.categories,
         hierarchical: true,
         loc,
+        acf: acfOf(slugs.categories),
       }),
     },
     {
       name: 'Tags.ts',
-      content: termCollection({ exportName: 'Tags', slug: slugs.tags, hierarchical: false, loc }),
+      content: termCollection({
+        exportName: 'Tags',
+        slug: slugs.tags,
+        hierarchical: false,
+        loc,
+        acf: acfOf(slugs.tags),
+      }),
     },
     ...custom.taxonomies.map((t) => ({
       name: `${nameOf(t.slug)}.ts`,
@@ -278,6 +291,7 @@ export const Media: CollectionConfig = {
         hierarchical: t.hierarchical,
         wpName: t.wpName,
         loc,
+        acf: acfOf(t.slug),
       }),
     })),
     {
@@ -314,6 +328,7 @@ export const Authors: CollectionConfig = {
           ...custom.postRelations,
         ],
         loc,
+        acf: acfOf(slugs.posts),
       }),
     },
     {
@@ -325,6 +340,7 @@ export const Authors: CollectionConfig = {
         hierarchical: true,
         relations: custom.pageRelations,
         loc,
+        acf: acfOf(slugs.pages),
       }),
     },
     ...custom.postTypes.map((t) => ({
@@ -337,6 +353,7 @@ export const Authors: CollectionConfig = {
         relations: t.relations,
         wpName: t.wpName,
         loc,
+        acf: acfOf(t.slug),
       }),
     })),
     {
