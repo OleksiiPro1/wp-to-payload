@@ -27,7 +27,8 @@ export const summaryLines = (result: ImportResult): string[] => {
   const summary = summarizeWarnings(result.warnings)
   if (summary.length > 0) {
     lines.push('', `Warnings (${result.warnings.length}):`)
-    for (const { code, count } of summary) lines.push(`  ${code.padEnd(18)} ${count}`)
+    const codeWidth = Math.max(...summary.map((w) => w.code.length))
+    for (const { code, count } of summary) lines.push(`  ${code.padEnd(codeWidth)}  ${count}`)
   }
   if (result.errors.length > 0) {
     lines.push('', `Errors (${result.errors.length}):`)

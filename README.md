@@ -8,9 +8,11 @@ export file. No access to the old site is needed: no plugin, no API keys, no dat
 
 - **`analyze`** tells you what a site contains and how hard the move will be, before you start.
 - **`scaffold`** writes ready-made Payload collections for posts, pages, categories, tags,
-  authors and media, and for the site's custom post types and taxonomies.
+  authors and media, and for the site's custom post types and taxonomies, with their ACF
+  fields, and globals for the menus.
 - **`import`** brings everything into your Payload project through the Local API, with all
-  relations. Run it as often as you like: it updates what it imported before instead of
+  relations: content (also from Elementor), custom fields, menus, and every language of a
+  Polylang site. Run it as often as you like: it updates what it imported before instead of
   creating duplicates.
 - **`redirects`** maps every old URL to its new one, for Next.js, Apache, nginx, Netlify, the
   Payload redirects plugin, or as CSV and JSON.
@@ -20,27 +22,54 @@ export file. No access to the old site is needed: no plugin, no API keys, no dat
 
 ## Quick start
 
-Export your site in WordPress under **Tools → Export → All content**. Then, in the root of
-your Payload 3 project:
+Export your site in WordPress under **Tools → Export → All content**. Copy its
+`wp-content/uploads` folder too if you can; otherwise media files are downloaded from the site.
+
+Start a Payload project, or use an existing one (see below):
+
+```bash
+npx create-payload-app -n my-site -t blank
+```
+
+```bash
+cd my-site
+```
+
+The blank template has a `media` collection of its own. Delete `src/collections/Media.ts` and
+remove `Media` from `collections` in `src/payload.config.ts`: scaffold writes one with the field
+the import needs. Then look at what the site contains:
 
 ```bash
 npx wp-to-payload analyze export.xml
 ```
 
+Write the collections (and globals for the menus):
+
 ```bash
 npx wp-to-payload scaffold export.xml
 ```
 
-Add the printed lines to `payload.config.ts` (the collections and the SEO and redirects
-plugins), then:
+Add the lines it prints to `src/payload.config.ts`: the collections, the globals, the SEO and
+redirects plugins, and `localization` for a site in several languages. Install the two plugins
+it names. Then import, first as a dry run:
+
+```bash
+npx wp-to-payload import export.xml --uploads-dir ./uploads --dry-run
+```
 
 ```bash
 npx wp-to-payload import export.xml --uploads-dir ./uploads
 ```
 
-`--uploads-dir` points to a copy of the old site's `wp-content/uploads`. Without it, media
-files are downloaded from the site. Start with `--dry-run` to see what would change without
-writing anything.
+`--uploads-dir` points to the copy of `wp-content/uploads`. The import writes a report of
+everything it could not move as it was to `wp-to-payload-report/`; run it again whenever you
+like, it updates what it imported before.
+
+**An existing project**, such as one started from Payload's website template, may have
+collections with the same slugs (`posts`, `pages`, `categories`, `media`). Scaffold then stops
+and explains the choices: `--slug-prefix wp-` for collections of their own, or mapping your
+collections in `wp-to-payload.config.json` (see [Configuration file](#configuration-file)). The
+template's `header` and `footer` globals get the menus as they are.
 
 ## Requirements
 
@@ -456,9 +485,10 @@ The export is read twice as a stream. The first pass collects everything except 
 whatever order the file is in. The second pass converts and writes one post at a time.
 
 Content goes through four steps: the Gutenberg block comments are parsed (classic content gets
-paragraphs); shortcodes are replaced; the HTML is cleaned with jsdom (images matched to media,
-internal links rewritten, layout wrappers removed); and Payload's own `convertHTMLToLexical`
-turns it into Lexical, using the editor config of your `content` field.
+paragraphs, Elementor pages are turned into HTML from their widgets); shortcodes are replaced;
+the HTML is cleaned with jsdom (images matched to media, internal links rewritten, layout
+wrappers removed); and Payload's own `convertHTMLToLexical` turns it into Lexical, using the
+editor config of your `content` field. ACF's WYSIWYG fields take the same way.
 
 ## Alternatives
 

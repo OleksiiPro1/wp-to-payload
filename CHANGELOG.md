@@ -6,6 +6,11 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-02
+
+0.1.0 was not published to npm, so 0.2.0 is the first version there and includes everything
+listed under 0.1.0 as well.
+
 ### Added
 
 - Elementor. Pages built with Elementor are converted from Elementor's data (`_elementor_data`)
