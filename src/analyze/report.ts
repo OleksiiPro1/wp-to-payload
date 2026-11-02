@@ -124,6 +124,8 @@ export interface AnalyzeReport {
   acf: Detection
   /** ACF field groups and what the import does with their fields; only when ACF is found. */
   customFields?: CustomFieldsReport
+  /** Menus and the globals they go into with the default settings. */
+  menus: MenuReport[]
   complexity: { level: Complexity; score: number; reasons: ComplexityReason[] }
   issues: { line: number; column: number; message: string }[]
 }
@@ -159,4 +161,19 @@ export interface CustomFieldsReport {
   undefinedValues: { target: string; name: string; key: string; items: number }[]
   /** Date and time fields, whose values have no time zone. */
   dateTimeFields: number
+}
+
+export interface MenuReport {
+  name: string
+  slug: string
+  /** Entries, submenus included. */
+  items: number
+  /** 1 for a menu without submenus. */
+  levels: number
+  /** On multilingual sites: the language most of its links are in. */
+  language?: string
+  /** The Payload global it goes into, if any. */
+  global?: string
+  /** How the global was chosen, or why the menu is not imported. */
+  reason: string
 }

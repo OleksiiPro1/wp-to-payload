@@ -37,14 +37,15 @@ import { seoPlugin } from '@payloadcms/plugin-seo'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { buildConfig } from 'payload'
-import { wpCollections } from './collections/wp'
+import * as wp from './collections/wp'
 
 const dirname = path.dirname(fileURLToPath(import.meta.url))
 
 export default buildConfig({
   secret: 'integration-test-secret-not-for-production',
   db: sqliteAdapter({ client: { url: \`file:\${path.resolve(dirname, '../db.sqlite')}\` } }),
-  collections: wpCollections,
+  collections: wp.wpCollections,
+  globals: (wp as { wpGlobals?: [] }).wpGlobals ?? [],
   plugins: [
     seoPlugin({ collections: ${list}, uploadsCollection: 'media' }),
     redirectsPlugin({ collections: ${list} }),

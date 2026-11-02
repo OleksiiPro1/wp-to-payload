@@ -18,6 +18,16 @@ export interface PayloadField {
   defaultValue?: unknown
   /** Blocks of a blocks field. */
   blocks?: { slug: string; fields?: PayloadField[]; flattenedFields?: PayloadField[] }[]
+  /** Arrays: the most rows allowed. */
+  maxRows?: number
+}
+
+/** A global as Payload's sanitized config describes it. */
+export interface PayloadGlobal {
+  slug: string
+  fields?: PayloadField[]
+  flattenedFields?: PayloadField[]
+  versions?: { drafts?: unknown } | boolean
 }
 
 export interface PayloadCollection {
@@ -74,6 +84,7 @@ export interface PayloadLike {
   }): Promise<FindResult>
   create(args: WriteArgs): Promise<PayloadDoc>
   update(args: WriteArgs & { id: DocId }): Promise<PayloadDoc>
+  updateGlobal(args: Omit<WriteArgs, 'collection' | 'file'> & { slug: string }): Promise<unknown>
   destroy?: () => Promise<void>
 }
 

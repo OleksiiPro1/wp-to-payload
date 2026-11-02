@@ -8,6 +8,7 @@ import { BLOCK_OPENER, blockSupport, hasBlocks, normalizeBlockName } from '../co
 import { scanShortcodes } from '../content/shortcodes-scan.js'
 import { DEFAULT_CONFIG } from '../config.js'
 import { LanguageCollector, wpmlKeysOf } from '../languages.js'
+import { MenuCollector, menuLevels, placeMenus } from '../menus.js'
 import {
   BUILTIN_POST_TYPES,
   BUILTIN_TAXONOMIES,
@@ -29,6 +30,7 @@ import type {
   CustomTaxonomy,
   Detection,
   LanguagesReport,
+  MenuReport,
   NamedCount,
   StatusCounts,
 } from './report.js'
@@ -153,6 +155,7 @@ export const analyzeExport = async (
   let acfFieldGroups = 0
   let acfFields = 0
   const acfCollector = new AcfCollector()
+  const menuCollector = new MenuCollector()
   const typeOfPost = new Map<number, string>()
 
   const scanContent = (item: WxrItem) => {
@@ -193,6 +196,7 @@ export const analyzeExport = async (
         surveyor.addTerm(record.term)
         languageCollector.addTerm(record.term)
         acfCollector.addTerm(record.term)
+        menuCollector.addTerm(record.term)
       }
       continue
     }
@@ -200,6 +204,7 @@ export const analyzeExport = async (
     const { item } = record
     surveyor.addItem(item)
     acfCollector.addItem(item)
+    menuCollector.addItem(item)
     typeOfPost.set(item.id, item.type)
     const wpmlKeys = wpmlKeysOf(item.meta)
     languageCollector.addItem(
@@ -423,6 +428,18 @@ export const analyzeExport = async (
     }
   }
 
+  const menus: MenuReport[] = placeMenus(menuCollector.result(), DEFAULT_CONFIG, siteLanguages).map(
+    (p) => ({
+      name: p.menu.name,
+      slug: p.menu.slug,
+      items: p.menu.items.length,
+      levels: menuLevels(p.menu),
+      ...(p.language ? { language: p.language } : {}),
+      ...(p.global ? { global: p.global } : {}),
+      reason: p.reason,
+    }),
+  )
+
   const toList = (map: Map<string, Usage>): NamedCount[] =>
     [...map].map(([name, u]) => ({ name, count: u.count, items: u.items })).sort(byCount)
 
@@ -487,6 +504,7 @@ export const analyzeExport = async (
     woocommerce: woo,
     acf,
     ...(customFields ? { customFields } : {}),
+    menus,
     complexity: { level: 'simple', score: 0, reasons: [] },
     issues,
   }

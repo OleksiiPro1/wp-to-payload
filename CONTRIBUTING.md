@@ -48,6 +48,7 @@ src/
   util/       entities, slugs, MIME types, PHP serialize() reader
   site-types.ts  which post types and taxonomies are imported, into which collections
   languages.ts   languages and translation groups (Polylang, WPML Export and Import, URLs)
+  menus.ts       menus, their entries, and which global each goes into
   site.ts        types, languages and URLs of an export together
 scripts/
   fixtures/   builds WordPress sites in Docker and exports them as fixtures

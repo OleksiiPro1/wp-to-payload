@@ -284,6 +284,26 @@ export const renderMarkdown = (r: AnalyzeReport): string => {
     push(`Polylang languages: ${languages.join(', ')}.`, '')
   if (r.customFields) pushCustomFields(r.customFields, push)
 
+  if (r.menus.length > 0) {
+    push('## Menus', '')
+    const multilingual = r.menus.some((m) => m.language)
+    push(
+      ...tableOf(
+        ['Menu', 'Entries', 'Levels', ...(multilingual ? ['Language'] : []), 'Import'],
+        r.menus.map((m) => [
+          `${m.name} (${m.slug})`,
+          m.items,
+          m.levels,
+          ...(multilingual ? [m.language ?? '–'] : []),
+          m.global ? `global \`${m.global}\` (${m.reason})` : `not imported: ${m.reason}`,
+        ]),
+      ),
+      '',
+      "Which menu a theme shows where is not in the export: menus go into the `header` and `footer` globals by their names, and `menus` in wp-to-payload.config.json can choose. Payload's navItems have one level, so submenus are put after their parent.",
+      '',
+    )
+  }
+
   push('## Media', '')
   const media = Object.entries(r.media.byType).sort((a, b) => b[1] - a[1])
   if (media.length === 0) push('No media files.', '')

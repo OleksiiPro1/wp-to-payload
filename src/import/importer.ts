@@ -11,7 +11,9 @@ import type { Config } from '../config.js'
 import { buildRedirects } from '../redirects/build.js'
 import { type Warning, WarningCollector } from '../report/warnings.js'
 import { extractSeo } from '../seo/seo.js'
-import { translationsOf, termTranslationsOf } from '../languages.js'
+import { newPrefixOf, translationsOf, termTranslationsOf } from '../languages.js'
+import { flattenMenu, menuItemLabel, placeMenus } from '../menus.js'
+import { fillPattern } from '../paths/patterns.js'
 import { describeSite } from '../site.js'
 import type { PostTypeTarget, TaxonomyTarget } from '../site-types.js'
 import { decodeEntities } from '../util/entities.js'
@@ -33,6 +35,7 @@ import type {
   LexicalModule,
   PayloadDoc,
   PayloadField,
+  PayloadGlobal,
   PayloadLike,
   SanitizedEditorConfig,
 } from './payload-types.js'
@@ -258,6 +261,8 @@ export const importExport = async (
     ...types.taxonomies.map((t): [Phase, string] => [t.phase, t.collection]),
     ['authors', slugs.authors],
     ...types.postTypes.map((t): [Phase, string] => [t.phase, t.collection]),
+    // Menus go into globals, not a collection.
+    ...(index.menus.some((m) => m.items.length > 0) ? [['menus', ''] as [Phase, string]] : []),
     ['redirects', slugs.redirects],
   ])
   const unknownPhases = options.only.filter((p) => !phaseCollection.has(p))
@@ -338,7 +343,7 @@ export const importExport = async (
 
   const problems: string[] = []
   for (const [phase, slug] of phaseCollection) {
-    if (!selected.has(phase)) continue
+    if (!selected.has(phase) || phase === 'menus') continue
     const schema = schemaOf(slug)
     if (!schema) {
       selected.delete(phase)
@@ -1310,6 +1315,203 @@ export const importExport = async (
         ...(p.postId ? { wpId: p.postId } : {}),
         message: `setting ACF references failed: ${errorMessage(error)}`,
       })
+    }
+  }
+
+  // Menus ------------------------------------------------------------------------------------
+  if (selected.has('menus')) {
+    const stats = (result.phases.menus ??= emptyPhase())
+    const menuWarnings = warnings.for({ wpType: 'nav_menu' })
+    const globals = (payload.config as { globals?: PayloadGlobal[] }).globals ?? []
+    const termById = new Map(index.terms.flatMap((t) => (t.id === undefined ? [] : [[t.id, t]])))
+    /** A field of a global or group: flattened, so rows and tabs do not hide it. */
+    const fieldIn = (fields: PayloadField[] | undefined, name: string) =>
+      fields?.find((f) => f.name === name)
+    /** New path of a post type's archive: the fixed start of its pattern. */
+    const archivePath = (postType: string, language?: string): string | undefined => {
+      const pattern = types.patterns[postType]
+      if (!pattern) return undefined
+      const fixed: string[] = []
+      for (const segment of pattern.split('/').filter(Boolean)) {
+        if (segment.includes(':') && segment !== ':locale') break
+        fixed.push(segment)
+      }
+      if (fixed.every((s) => s === ':locale')) return undefined
+      const path = `/${fixed.join('/')}`
+      if (!languages) return fillPattern(path, { locale: '' })
+      const prefix = newPrefixOf(languages, config, language ?? languages.defaultLanguage)
+      return fillPattern(path.includes(':locale') ? path : `/:locale${path}`, { locale: prefix })
+    }
+    const notLocalizedMenus = new Set<string>()
+    log(`Menus: ${index.menus.filter((m) => m.items.length > 0).length}`)
+    for (const placement of placeMenus(index.menus, config, languages)) {
+      const { menu } = placement
+      if (menu.items.length === 0 || placement.excluded) continue
+      const skip = (reason: string) => {
+        stats.skipped++
+        menuWarnings.add(
+          'MENU_SKIPPED',
+          `Menu "${menu.name}" (${menu.items.length} ${menu.items.length === 1 ? 'entry' : 'entries'}) was not imported: ${reason}.`,
+          menu.slug,
+        )
+      }
+      if (!placement.global) {
+        skip(placement.reason)
+        continue
+      }
+      const global = globals.find((g) => g.slug === placement.global)
+      if (!global) {
+        skip(
+          `there is no global "${placement.global}" (run scaffold with the export, or name another global under "menus" in the config)`,
+        )
+        continue
+      }
+      const navItems = fieldIn(global.flattenedFields ?? global.fields, 'navItems')
+      const link = fieldIn(navItems?.flattenedFields ?? navItems?.fields, 'link')
+      const linkFields = link?.flattenedFields ?? link?.fields
+      if (navItems?.type !== 'array' || link?.type !== 'group' || !fieldIn(linkFields, 'url')) {
+        skip(
+          `global "${global.slug}" has no navItems array with a link group like the website template's`,
+        )
+        continue
+      }
+      const locale =
+        placement.language && locales ? locales.localeOf(placement.language) : undefined
+      if (placement.language && languages && locale === undefined) continue
+      const defaultMenu = !languages || placement.language === languages.defaultLanguage
+      if (languages && locale && !navItems.localized && !defaultMenu) {
+        if (!notLocalizedMenus.has(global.slug)) {
+          notLocalizedMenus.add(global.slug)
+          warnings.add(
+            'FIELD_NOT_LOCALIZED',
+            `Field "navItems" of global "${global.slug}" is not localized; only the ${languages.defaultLanguage} menu was imported.`,
+            `${global.slug}.navItems`,
+          )
+        }
+        stats.skipped++
+        continue
+      }
+      const reference = fieldIn(linkFields, 'reference')
+      const targets = new Set(
+        Array.isArray(reference?.relationTo)
+          ? reference.relationTo
+          : reference?.relationTo
+            ? [reference.relationTo]
+            : [],
+      )
+      const flat = flattenMenu(menu)
+      const nested = flat.filter((f) => f.depth > 0).length
+      if (nested > 0) {
+        menuWarnings.add(
+          'MENU_FLATTENED',
+          `Menu "${menu.name}": ${nested} ${nested === 1 ? 'entry' : 'entries'} of submenus ${nested === 1 ? 'was' : 'were'} put after ${nested === 1 ? 'its' : 'their'} parent at the top level; navItems has no levels.`,
+          menu.slug,
+        )
+      }
+      const rows: Record<string, unknown>[] = []
+      for (const { item } of flat) {
+        const label = menuItemLabel(item, {
+          post: (id) => decodeEntities(index.posts.get(id)?.title ?? ''),
+          term: (id) => termById.get(id)?.name,
+        })
+        const leftOut = (why: string) =>
+          menuWarnings.add(
+            'MENU_ITEM_SKIPPED',
+            `Menu "${menu.name}": the entry "${label}" was left out: ${why}.`,
+            menu.slug,
+          )
+        let target: Record<string, unknown> | undefined
+        if (item.type === 'post_type') {
+          const doc = docIds.get(item.objectId)
+          if (!doc) {
+            leftOut(`${item.object} ${item.objectId} was not imported`)
+            continue
+          }
+          if (targets.has(doc.collection)) {
+            target = {
+              type: 'reference',
+              reference: Array.isArray(reference?.relationTo)
+                ? { relationTo: doc.collection, value: doc.id }
+                : doc.id,
+            }
+          } else {
+            const path = urls.newPath(item.objectId)
+            if (!path) {
+              leftOut(
+                `its ${item.object} has no new URL and the link cannot point to collection "${doc.collection}"`,
+              )
+              continue
+            }
+            target = { type: 'custom', url: path }
+          }
+        } else if (item.type === 'taxonomy') {
+          const term = termById.get(item.objectId)
+          if (!term) {
+            leftOut(`term ${item.objectId} is not in the export`)
+            continue
+          }
+          const path = urls.termPath(term.taxonomy, term.slug)
+          if (path) target = { type: 'custom', url: path }
+          else {
+            const base =
+              term.taxonomy === 'category'
+                ? 'category'
+                : term.taxonomy === 'post_tag'
+                  ? 'tag'
+                  : (types.taxonomies.find((t) => t.taxonomy === term.taxonomy)?.base ??
+                    term.taxonomy)
+            const old = urls.oldTermPath(term.taxonomy, term.slug, base)
+            target = { type: 'custom', url: old }
+            menuWarnings.add(
+              'MENU_LINK_UNCHANGED',
+              `Menu "${menu.name}": the entry "${label}" links to the ${term.taxonomy} archive ${old}, which has no new URL; set its path in the config (paths.category, paths.tag or taxonomies.<name>.path).`,
+              menu.slug,
+            )
+          }
+        } else if (item.type === 'post_type_archive') {
+          const path = archivePath(item.object, placement.language)
+          if (path) target = { type: 'custom', url: path }
+          else {
+            leftOut(`the post type ${item.object} has no archive URL in its pattern`)
+            continue
+          }
+        } else {
+          target = { type: 'custom', url: urls.rewriteHref(item.url) ?? (item.url || '#') }
+        }
+        rows.push({ link: { ...target, label, newTab: item.newTab } })
+      }
+      const max = navItems.maxRows
+      if (max !== undefined && rows.length > max) {
+        const dropped = rows.splice(max)
+        menuWarnings.add(
+          'MENU_ITEM_SKIPPED',
+          `Menu "${menu.name}": global "${global.slug}" allows ${max} entries; the last ${dropped.length} were left out.`,
+          menu.slug,
+        )
+      }
+      if (options.dryRun) {
+        stats.updated++
+        continue
+      }
+      const drafts = typeof global.versions === 'object' && Boolean(global.versions.drafts)
+      try {
+        await payload.updateGlobal({
+          slug: global.slug,
+          data: { navItems: rows, ...(drafts ? { _status: 'published' } : {}) },
+          depth: 0,
+          overrideAccess: true,
+          context: WRITE_CONTEXT,
+          ...(drafts ? { draft: false } : {}),
+          ...(locale ? { locale } : {}),
+        })
+        stats.updated++
+        log(
+          `  ${menu.name} → ${global.slug}${locale ? ` (${locale})` : ''}: ${rows.length} entries`,
+        )
+      } catch (error) {
+        stats.failed++
+        result.errors.push({ phase: 'menus', message: `${menu.name}: ${errorMessage(error)}` })
+      }
     }
   }
 

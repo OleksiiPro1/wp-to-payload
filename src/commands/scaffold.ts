@@ -12,11 +12,13 @@ import { findPackageDir } from '../import/project.js'
 import {
   configSnippet,
   type ScaffoldCustom,
+  type ScaffoldGlobals,
   type ScaffoldLocalization,
   type ScaffoldRelation,
   scaffoldFiles,
 } from '../scaffold/templates.js'
 import { indexLanguages, type SiteLanguages } from '../languages.js'
+import { placeMenus } from '../menus.js'
 import { EMPTY_SURVEY, resolveSiteTypes, type SiteTypes, surveyIndex } from '../site-types.js'
 import { buildSiteIndex } from '../wxr/site-index.js'
 
@@ -220,6 +222,17 @@ export const scaffoldCommand: Command = {
       stringOption(ctx, 'out') ?? (hasSrc ? 'src/collections/wp' : 'collections/wp'),
     )
 
+    // Globals for the menus of the export, such as header and footer.
+    const rank = (slug: string) => ['header', 'footer'].indexOf(slug) + 1 || 3
+    const menuGlobals = index
+      ? [
+          ...new Set(
+            placeMenus(index.menus, config, languages)
+              .map((p) => p.global)
+              .filter((g): g is string => g !== undefined),
+          ),
+        ].sort((a, b) => rank(a) - rank(b) || a.localeCompare(b))
+      : []
     const wanted = [
       slugs.posts,
       slugs.pages,
@@ -230,7 +243,15 @@ export const scaffoldCommand: Command = {
       ...custom.taxonomies.map((t) => t.slug),
       ...custom.postTypes.map((t) => t.slug),
     ]
-    const clashes = await findExistingSlugs(hasSrc ? join(ctx.cwd, 'src') : ctx.cwd, outDir, wanted)
+    const root = hasSrc ? join(ctx.cwd, 'src') : ctx.cwd
+    // A project with the website template has header and footer globals already; the import
+    // writes the menus into them.
+    const ownGlobals = await findExistingSlugs(root, outDir, menuGlobals)
+    const globals: ScaffoldGlobals = {
+      slugs: menuGlobals.filter((g) => !ownGlobals.has(g)),
+      documents: [...new Set([slugs.pages, slugs.posts, ...custom.postTypes.map((t) => t.slug)])],
+    }
+    const clashes = await findExistingSlugs(root, outDir, wanted)
     if (clashes.size > 0) {
       for (const [slug, file] of clashes)
         warn(`Your project already has a collection "${slug}" (${relative(ctx.cwd, file)}).`)
@@ -249,7 +270,7 @@ export const scaffoldCommand: Command = {
     await mkdir(outDir, { recursive: true })
     const written: string[] = []
     const kept: string[] = []
-    for (const file of scaffoldFiles(slugs, custom, localization, acf)) {
+    for (const file of scaffoldFiles(slugs, custom, localization, acf, globals)) {
       const path = join(outDir, file.name)
       if (existsSync(path) && !ctx.values.force) {
         kept.push(path)
@@ -272,6 +293,20 @@ export const scaffoldCommand: Command = {
       )
     }
 
+    if (globals.slugs.length > 0 || ownGlobals.size > 0) {
+      out()
+      out('Menus of the export:')
+      for (const p of placeMenus(index?.menus ?? [], config, languages)) {
+        if (p.menu.items.length === 0) continue
+        const where = p.global
+          ? `${p.global}${p.language ? ` (${p.language})` : ''}`
+          : `not imported: ${p.reason}`
+        out(`  ${p.menu.name} → ${where}`)
+      }
+      for (const [slug, file] of ownGlobals) {
+        info(`Your global "${slug}" (${relative(ctx.cwd, file)}) gets the menu in its navItems.`)
+      }
+    }
     if (acf && acf.collections.size > 0) {
       out()
       out('Custom fields (ACF) in the collections:')
@@ -320,7 +355,16 @@ export const scaffoldCommand: Command = {
     )
     out()
     out(
-      paint('cyan', configSnippet(slugs, importPathFrom(configFile, outDir), custom, localization)),
+      paint(
+        'cyan',
+        configSnippet(
+          slugs,
+          importPathFrom(configFile, outDir),
+          custom,
+          localization,
+          globals.slugs.length > 0,
+        ),
+      ),
     )
     if (languages && localization) {
       out()

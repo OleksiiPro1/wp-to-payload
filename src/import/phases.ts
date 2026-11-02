@@ -1,6 +1,6 @@
 /**
  * Built-in import steps, in the order they run. Custom taxonomies add steps after the tags,
- * custom post types after the pages.
+ * custom post types after the pages. Menus come after all documents, which they link to.
  */
 export const PHASES = [
   'media',
@@ -9,6 +9,7 @@ export const PHASES = [
   'authors',
   'posts',
   'pages',
+  'menus',
   'redirects',
 ] as const
 
@@ -22,6 +23,7 @@ const LABELS: Record<string, string> = {
   authors: 'Authors',
   posts: 'Posts',
   pages: 'Pages',
+  menus: 'Menus',
   redirects: 'Redirects',
 }
 

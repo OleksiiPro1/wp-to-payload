@@ -43,6 +43,7 @@ interface Imported {
   rye_flour: { parent?: string; links: string[] }
   sourdoughBread?: string
   redirects: string[]
+  menus: Record<string, (string | boolean)[][]>
 }
 
 interface Report {
@@ -114,10 +115,17 @@ describe.skipIf(!projectInstalled())('import of a real WordPress export', () => 
       pages: { created: 3, failed: 0 },
       guides: { created: 2, failed: 0 },
       recipes: { created: 2, failed: 0 },
+      menus: { updated: 2, skipped: 0 },
       redirects: { created: 11 },
     })
     const codes = new Set(r.warnings.map((w) => w.code))
-    expect([...codes].sort()).toEqual(['BLOCK_REMOVED', 'PASSWORD_PROTECTED', 'SHORTCODE_REMOVED'])
+    expect([...codes].sort()).toEqual([
+      'BLOCK_REMOVED',
+      'MENU_FLATTENED',
+      'MENU_LINK_UNCHANGED',
+      'PASSWORD_PROTECTED',
+      'SHORTCODE_REMOVED',
+    ])
 
     const data = queryPayload<Imported>(
       dir,
@@ -160,6 +168,13 @@ describe.skipIf(!projectInstalled())('import of a real WordPress export', () => 
         redirects: (await payload.find({ collection: 'redirects', depth: 0, pagination: false, sort: 'from' })).docs
           .filter((d: any) => !d.from.startsWith('/20'))
           .map((d: any) => d.from + ' ' + (d.to.type === 'reference' ? d.to.reference.relationTo : d.to.url)),
+        menus: Object.fromEntries(await Promise.all(['header', 'footer'].map(async (slug) => [
+          slug,
+          ((await payload.findGlobal({ slug: slug as never, depth: 1 })) as any).navItems.map(({ link }: any) =>
+            link.type === 'reference'
+              ? [link.label, link.reference.relationTo, link.reference.value.slug, link.newTab]
+              : [link.label, link.url, link.newTab]),
+        ]))),
       }`,
     )
     expect(data.hello).toEqual({
@@ -204,6 +219,21 @@ describe.skipIf(!projectInstalled())('import of a real WordPress export', () => 
       categories: ['brot', 'sauerteigbrot'],
     })
     expect(data.sourdoughBread).toBe('brot')
+    // Menus: a submenu put after its parent, links to documents, a category archive without a
+    // new URL, and custom links.
+    expect(data.menus).toEqual({
+      header: [
+        ['Über uns', 'pages', 'ueber-uns', false],
+        ['Team', 'pages', 'team', false],
+        ['Rezepte', '/category/rezepte/', false],
+        ['Sauerteig', 'posts', 'hallo-sauerteig', false],
+        ['Onlineshop', 'https://shop.example.org/', true],
+      ],
+      footer: [
+        ['Kontakt', 'pages', 'kontakt', false],
+        ['Impressum', '/impressum/', false],
+      ],
+    })
     expect(data.rollsLinks).toEqual(['/recipes/roggenbrot', '/rezepte/kategorie/suesses'])
     // A hierarchical custom post type.
     expect(data.rye_flour).toEqual({ parent: 'mehlsorten', links: ['/recipes/roggenbrot'] })
