@@ -8,9 +8,11 @@ import { findPackageDir } from '../import/project.js'
 import {
   configSnippet,
   type ScaffoldCustom,
+  type ScaffoldLocalization,
   type ScaffoldRelation,
   scaffoldFiles,
 } from '../scaffold/templates.js'
+import { indexLanguages, type SiteLanguages } from '../languages.js'
 import { EMPTY_SURVEY, resolveSiteTypes, type SiteTypes, surveyIndex } from '../site-types.js'
 import { buildSiteIndex } from '../wxr/site-index.js'
 
@@ -111,6 +113,19 @@ const customCollections = (
   }
 }
 
+/** Payload locales for the site's languages: the default first, as the import maps them. */
+const localizationOf = (languages: SiteLanguages, config: Config): ScaffoldLocalization => {
+  const codeOf = (code: string) => config.localization.locales[code] ?? code
+  const ordered = [
+    ...languages.languages.filter((l) => l.code === languages.defaultLanguage),
+    ...languages.languages.filter((l) => l.code !== languages.defaultLanguage),
+  ]
+  return {
+    locales: ordered.map((l) => ({ code: codeOf(l.code), label: l.name ?? l.code })),
+    defaultLocale: codeOf(languages.defaultLanguage),
+  }
+}
+
 /** The config settings that point the import to the prefixed collections. */
 const prefixedSettings = (slugs: CollectionSlugs, custom: ScaffoldCustom, config: Config) => {
   const collections: Partial<CollectionSlugs> = { ...slugs }
@@ -163,7 +178,10 @@ export const scaffoldCommand: Command = {
     ) as unknown as CollectionSlugs
     const exportFile = ctx.positionals[0] ? resolve(ctx.cwd, ctx.positionals[0]) : undefined
     if (exportFile && !existsSync(exportFile)) throw new UsageError(`${exportFile} does not exist`)
-    const survey = exportFile ? surveyIndex(await buildSiteIndex(exportFile)) : EMPTY_SURVEY
+    const index = exportFile ? await buildSiteIndex(exportFile) : undefined
+    const survey = index ? surveyIndex(index) : EMPTY_SURVEY
+    const languages = index ? indexLanguages(index, config) : undefined
+    const localization = languages ? localizationOf(languages, config) : undefined
     const custom = customCollections(resolveSiteTypes(config, survey), slugs, prefix)
     const hasSrc = existsSync(join(ctx.cwd, 'src'))
     const outDir = resolve(
@@ -200,7 +218,7 @@ export const scaffoldCommand: Command = {
     await mkdir(outDir, { recursive: true })
     const written: string[] = []
     const kept: string[] = []
-    for (const file of scaffoldFiles(slugs, custom)) {
+    for (const file of scaffoldFiles(slugs, custom, localization)) {
       const path = join(outDir, file.name)
       if (existsSync(path) && !ctx.values.force) {
         kept.push(path)
@@ -245,7 +263,15 @@ export const scaffoldCommand: Command = {
       `Add the collections and plugins to ${configFile ? relative(ctx.cwd, configFile) : 'payload.config.ts'}:`,
     )
     out()
-    out(paint('cyan', configSnippet(slugs, importPathFrom(configFile, outDir), custom)))
+    out(
+      paint('cyan', configSnippet(slugs, importPathFrom(configFile, outDir), custom, localization)),
+    )
+    if (languages && localization) {
+      out()
+      out(
+        `The site is in ${languages.languages.length} languages (${languages.source}); the collections keep texts per locale.`,
+      )
+    }
     out()
     const missing = ['@payloadcms/plugin-seo', '@payloadcms/plugin-redirects'].filter(
       (p) => !findPackageDir(p, ctx.cwd),
