@@ -94,6 +94,11 @@ export interface Config {
   acfJson: string[]
   /** IANA time zone of the site (`Europe/Vienna`), for ACF dates with times. */
   timeZone?: string
+  /**
+   * Menus by slug or name → the Payload global they go into (`header`, `footer`), or false to
+   * leave a menu out. Menus not named here are placed by their names.
+   */
+  menus: Record<string, string | false>
 }
 
 export const DEFAULT_CONFIG: Config = {
@@ -130,6 +135,7 @@ export const DEFAULT_CONFIG: Config = {
   media: { hosts: [] },
   importAuthorEmails: false,
   acfJson: [],
+  menus: {},
 }
 
 export class ConfigError extends Error {
@@ -171,6 +177,7 @@ const KNOWN_KEYS = new Set([
   'localization',
   'acfJson',
   'timeZone',
+  'menus',
 ])
 
 type SettingType = 'string' | 'pattern' | 'boolean'
@@ -304,6 +311,15 @@ export const parseConfig = (raw: unknown, source = CONFIG_FILE): Config => {
   }
   const acfJson =
     typeof raw.acfJson === 'string' ? [raw.acfJson] : stringList(raw.acfJson, `${source}: acfJson`)
+  const menus = raw.menus === undefined ? {} : raw.menus
+  if (!isObject(menus)) throw new ConfigError(`${source}: menus must be an object`)
+  for (const [name, target] of Object.entries(menus)) {
+    if (target !== false && (typeof target !== 'string' || !/^[a-zA-Z0-9_-]+$/.test(target))) {
+      throw new ConfigError(
+        `${source}: menus.${name} must be the slug of a Payload global (such as "header") or false`,
+      )
+    }
+  }
   if (
     raw.timeZone !== undefined &&
     (typeof raw.timeZone !== 'string' || !isTimeZone(raw.timeZone))
@@ -331,6 +347,7 @@ export const parseConfig = (raw: unknown, source = CONFIG_FILE): Config => {
     },
     acfJson,
     ...(typeof raw.timeZone === 'string' ? { timeZone: raw.timeZone } : {}),
+    menus: menus as Record<string, string | false>,
   }
 }
 
