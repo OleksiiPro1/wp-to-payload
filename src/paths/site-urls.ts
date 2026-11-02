@@ -171,6 +171,11 @@ export class SiteUrls {
     })
   }
 
+  /** The path of a term archive on the old site, WordPress's default `/<base>/<term>/`. */
+  oldTermPath(taxonomy: string, slug: string, base: string): string {
+    return `${this.sitePath}${this.oldTermPrefix(taxonomy, slug)}/${base}/${this.termTree(taxonomy, slug)}/`
+  }
+
   /** The language directory of a term archive in the old URLs (`/en`), or empty. */
   oldTermPrefix(taxonomy: string, slug: string): string {
     return this.languages?.oldTermPrefix(taxonomy, slug) ?? ''
