@@ -112,10 +112,13 @@ describe.skipIf(!installed)('import into a Payload 3 project with SQLite', () =>
       pages: { created: 3 },
       // The recipe has no collection, but its old URL is redirected all the same.
       redirects: { created: 5 },
+      // Scaffold ran without the export, so there is no global for the menu.
+      menus: { skipped: 1 },
     })
     expect(r.warnings.map((w) => w.code).sort()).toEqual([
       'BLOCK_REMOVED',
       'COLLECTION_MISSING',
+      'MENU_SKIPPED',
       'SEO_CANONICAL',
       'SEO_VARIABLE',
       'SHORTCODE_REMOVED',

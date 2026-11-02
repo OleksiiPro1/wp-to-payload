@@ -41,6 +41,7 @@ interface Imported {
   furniture: { title: string; parent?: string }
   media: { same: boolean; alt: string[] }
   redirects: string[]
+  menus: Record<string, string[][]>
 }
 
 interface Report {
@@ -105,7 +106,10 @@ describe.skipIf(!projectInstalled())('import of a multilingual Polylang site', (
       posts: { created: 4, failed: 0 },
     })
     // The German draft of a published post stays out.
-    expect(r.warnings.map((w) => [w.code, w.wpId])).toEqual([['TRANSLATION_DRAFT', 15]])
+    expect(
+      r.warnings.filter((w) => !w.code.startsWith('MENU_')).map((w) => [w.code, w.wpId]),
+    ).toEqual([['TRANSLATION_DRAFT', 15]])
+    expect(r.phases.menus).toMatchObject({ updated: 3, skipped: 0 })
 
     const data = queryPayload<Imported>(
       dir,
@@ -154,6 +158,12 @@ describe.skipIf(!projectInstalled())('import of a multilingual Polylang site', (
         media: { same: mediaDe.id === mediaEn.id, alt: [mediaDe.alt, mediaEn.alt] },
         redirects: (await payload.find({ collection: 'redirects', depth: 0, pagination: false, sort: 'from' })).docs
           .map((d: any) => d.from + ' ' + (d.to.type === 'reference' ? d.to.reference.relationTo : d.to.url)),
+        menus: Object.fromEntries(await Promise.all(['header:de', 'header:en', 'footer:de', 'footer:en'].map(async (key) => {
+          const [slug, locale] = key.split(':')
+          const global = (await payload.findGlobal({ slug: slug as never, locale: locale as never, fallbackLocale: false as never, depth: 1 })) as any
+          return [key, (global.navItems ?? []).map(({ link }: any) =>
+            link.type === 'reference' ? [link.label, link.reference.value.slug] : [link.label, link.url])]
+        }))),
       }`,
     )
     expect(data.about).toMatchObject({
@@ -182,6 +192,23 @@ describe.skipIf(!projectInstalled())('import of a multilingual Polylang site', (
     expect(data.products).toEqual(['Products', 'products'])
     expect(data.furniture).toEqual({ title: 'Möbel', parent: 'produkte' })
     expect(data.media).toEqual({ same: true, alt: ['Unsere Werkstatt', 'Our workshop'] })
+    // A menu per language in the localized navItems; the reference shows the locale's slug.
+    expect(data.menus).toEqual({
+      'header:de': [
+        ['Über uns', 'ueber-uns'],
+        ['Team', 'team'],
+        ['Neuigkeiten', '/category/neuigkeiten/'],
+        ['Kontakt', 'kontakt'],
+      ],
+      'header:en': [
+        ['About us', 'about-us'],
+        ['Our team', 'our-team'],
+        ['News', '/en/category/news/'],
+        ['Contact', 'contact'],
+      ],
+      'footer:de': [['Impressum', 'impressum']],
+      'footer:en': [],
+    })
     expect(data.redirects).toEqual(
       expect.arrayContaining([
         '/2024/02/01/neue-werkbank/ posts',
