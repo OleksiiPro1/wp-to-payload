@@ -193,3 +193,23 @@ describe('analyze', () => {
     expect(r.complexity.level).toBe('simple')
   })
 })
+
+describe('the WP-CLI export of the same site', () => {
+  it('has the same languages and translations', async () => {
+    const cli = fileURLToPath(
+      new URL('../fixtures/wxr/wordpress/multilingual.wp-cli.xml', import.meta.url),
+    )
+    const summary = async (file: string) => {
+      const languages = indexLanguages(await buildSiteIndex(file), DEFAULT_CONFIG) as SiteLanguages
+      return {
+        languages: languages.languages,
+        defaultLanguage: languages.defaultLanguage,
+        items: [...languages.itemLanguage].sort((a, b) => a[0] - b[0]),
+        groups: [...languages.itemTranslations]
+          .map(([id, group]) => `${id}:${[...group].sort().join(',')}`)
+          .sort(),
+      }
+    }
+    expect(await summary(cli)).toEqual(await summary(multilingual))
+  })
+})
