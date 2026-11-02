@@ -88,7 +88,9 @@ writing anything.
 | ACF password fields                                                                                                              | Never imported                                                                                      | ❌  |
 | ACF options pages and ACF blocks                                                                                                 | Not imported (options are not in the export; ACF blocks are reported as plugin blocks)              | ❌  |
 | Other post meta of plugins                                                                                                       | Not imported                                                                                        | ❌  |
-| Comments, menus                                                                                                                  | Counted and reported, not imported                                                                  | ❌  |
+| Menus                                                                                                                            | `header` and `footer` globals: `navItems` with links like the website template                      | ✅  |
+| Submenus                                                                                                                         | Put after their parent entry, because `navItems` has one level                                      | ⚠️  |
+| Comments                                                                                                                         | Counted and reported, not imported                                                                  | ❌  |
 | Post types of plugins: forms and their entries, page builder templates, ACF settings                                             | Listed in the reports, never imported (ACF field groups are read for the fields)                    | ❌  |
 | Polylang: languages and translations of posts, pages, custom post types, terms and images                                        | One document per translation group, texts per Payload locale; redirects per language                | ✅  |
 | WPML with its WPML Export and Import add-on (experimental)                                                                       | As for Polylang, from the add-on's documented post meta                                             | ⚠️  |
@@ -132,7 +134,9 @@ field when its items have parents, and a relationship field for each taxonomy it
 (`recipeCategories` for `recipe_category`). Post types of plugins, such as forms or page builder
 templates, get none. Delete the files of types you do not need; the import skips types without
 a collection and says so. The collections also get the site's ACF fields; see
-[Custom fields](#custom-fields-acf).
+[Custom fields](#custom-fields-acf). For the menus of the export, scaffold writes `Header` and
+`Footer` globals shaped like the website template's, unless your project has globals with these
+slugs already; see [Menus](#menus).
 
 The files are yours afterwards; existing files are never overwritten without `--force`. If
 your project already has collections with these slugs (the Payload website template has
@@ -147,7 +151,7 @@ npx wp-to-payload import export.xml [options]
 
 Starts your project's Payload with `payload run`, so your `.env`, TypeScript config, database
 adapter and hooks work as usual. Steps: media → categories → tags → custom taxonomies → authors
-→ posts → pages → custom post types → (redirects). The steps of custom types are named after
+→ posts → pages → custom post types → menus → (redirects). The steps of custom types are named after
 their collections, as in `--only recipes`.
 
 | Option                |                                                                               |
@@ -246,7 +250,8 @@ project root. Everything is optional:
   "importAuthorEmails": false,
   "localization": { "defaultLanguage": "de", "locales": { "de": "de", "en": "en" } },
   "acfJson": ["wp-content/themes/my-theme/acf-json"],
-  "timeZone": "Europe/Vienna"
+  "timeZone": "Europe/Vienna",
+  "menus": { "Hauptmenü": "header", "footer-links": "footer", "social": false }
 }
 ```
 
@@ -275,6 +280,8 @@ project root. Everything is optional:
 - `acfJson`: ACF JSON files or folders with field groups that are not in the export, relative
   to the config file. `--acf-json` adds more.
 - `timeZone`: the site's time zone, for ACF dates with times (WordPress stores them without one).
+- `menus`: menus by slug or name → the Payload global they go into, or `false` to leave a menu
+  out. Menus not named here are placed by their names; see [Menus](#menus).
 
 ## Multilingual sites
 
@@ -344,6 +351,30 @@ of its fields.
   one) are left out and reported (`ACF_VALUE_INVALID`). A field your collection does not have is
   reported once (`FIELD_MISSING`) and not imported.
 
+## Menus
+
+Which menu a theme shows in which place is a theme setting, and the export does not contain it.
+So menus go into the `header` and `footer` globals by their names: "Footer", "Fußzeile" or
+"Legal" into the footer, "Main menu", "Primary" or "Hauptmenü" into the header. Without such a
+name, the largest remaining menu becomes the header. `menus` in the config file sets the global
+of any menu, also one of your own (`"social": "socialLinks"`), or leaves it out.
+
+The globals need a `navItems` array of `link` groups, as in the Payload website template and as
+`scaffold` writes them:
+
+- Entries for pages, posts and custom post types become internal links (`type: 'reference'`)
+  when the link field can point to their collection, and links to their new URL otherwise.
+- Category and tag entries link to the archive's new URL. Without a pattern for it
+  (`paths.category`), they keep the old URL and the report says so (`MENU_LINK_UNCHANGED`).
+- Custom links keep their URL; links to the old site get the new path. New tab is kept.
+- Labels are the entry's own label, or the title of what it links to.
+- Submenus are put after their parent (`MENU_FLATTENED`). Entries that link to something that
+  was not imported, or beyond the global's `maxRows` (the website template's header allows 6),
+  are left out (`MENU_ITEM_SKIPPED`).
+- On multilingual sites, each menu belongs to the language most of its links are in, and
+  `navItems` gets one menu per locale.
+- `navItems` is written anew on every run.
+
 ## Limitations
 
 - **Page builders.** For Elementor, Divi, WPBakery, Beaver Builder and Avada, the text and
@@ -372,7 +403,8 @@ of its fields.
 
 - WooCommerce products
 - ACF options pages and ACF blocks
-- Comments and menus
+- Comments
+- Nested menus (for headers that support them)
 - Reusable blocks (synced patterns) inlined into the content
 - Lexical internal links to documents
 - All in One SEO and SEOPress

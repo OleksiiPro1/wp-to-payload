@@ -8,6 +8,15 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- Menus. Every WordPress menu goes into a global, `header` or `footer`, by the `menus` setting or
+  by its name, with entries in `navItems` shaped like the links of the Payload website template:
+  internal links to the imported documents, archive and custom links with their new URLs, the
+  label and new tab. Submenus are put after their parent. On multilingual sites each menu goes
+  into the locale of its language. `scaffold export.xml` writes `Header` and `Footer` globals
+  (unless the project has them), `analyze` lists the menus with their places, and `--only menus`
+  runs the step on its own. New warning codes `MENU_SKIPPED`, `MENU_FLATTENED`,
+  `MENU_ITEM_SKIPPED` and `MENU_LINK_UNCHANGED`.
+
 - ACF fields (Advanced Custom Fields and Secure Custom Fields). Field groups are read from the
   export, and from ACF JSON files with the new `--acf-json` option or `acfJson` setting for
   groups that a theme keeps in code. `scaffold` writes their fields into the collections of the
