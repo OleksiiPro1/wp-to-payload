@@ -76,7 +76,9 @@ writing anything.
 | `[caption]`, `[gallery]`, `[embed]`                                                                                              | Images, captions and embeds                                                                         | ✅  |
 | `[audio]`, `[video]`                                                                                                             | Links to the files                                                                                  | ⚠️  |
 | Other shortcodes                                                                                                                 | Removed, the text inside kept, every place listed in the report                                     | ⚠️  |
-| Elementor, Divi, WPBakery, Beaver Builder, Avada                                                                                 | Text and images kept, layout lost, listed in the report                                             | ⚠️  |
+| Elementor: its free widgets and the Pro widgets call to action, slides, blockquote, animated headline, flip box                  | Rich text from Elementor's data, in reading order; the layout (sections, columns, styles) is lost   | ⚠️  |
+| Other Elementor widgets                                                                                                          | Left out, listed in the report with their type                                                      | ❌  |
+| Divi, WPBakery, Beaver Builder, Avada                                                                                            | Text and images kept, layout lost, listed in the report                                             | ⚠️  |
 | Oxygen, Bricks                                                                                                                   | Detected only (their content is not in post content)                                                | ❌  |
 | Old URLs                                                                                                                         | Redirects in six formats or in the Payload redirects plugin                                         | ✅  |
 | Custom post types                                                                                                                | A collection each (`recipes` for `recipe`) with the fields of posts; parents for hierarchical types | ✅  |
@@ -114,8 +116,9 @@ posts, pages, media, categories, tags, authors and comments; custom post types a
 with what the import does with them; every Gutenberg block with how the import handles it; shortcodes; page builders; SEO plugins;
 WPML and Polylang; WooCommerce; ACF field groups with the collections they go into and the
 fields that are not imported. It ends with a rating, **simple**, **medium** or
-**complex**, and lists the reasons behind it. Page builders, WooCommerce and multilingual
-content always make a site complex. `analyze` never needs Payload.
+**complex**, and lists the reasons behind it. Page builders whose content cannot be converted
+(all but Elementor), WooCommerce and multilingual content without linked translations always
+make a site complex. `analyze` never needs Payload.
 
 ### scaffold
 
@@ -375,11 +378,45 @@ The globals need a `navItems` array of `link` groups, as in the Payload website 
   `navItems` gets one menu per locale.
 - `navItems` is written anew on every run.
 
+## Elementor
+
+Elementor keeps a page as JSON in the post meta `_elementor_data`. The import walks its
+sections, columns and containers in reading order (the left column before the right one) and
+turns each widget into HTML, which then goes through the same pipeline as other content:
+images become uploads, links get their new URLs, shortcodes and embeds are handled as everywhere
+else. The layout itself (columns, spacing, colours, styles) is not migrated, and the report says
+so for every page (`BUILDER_MARKUP`).
+
+| Widget                                        | Becomes                                                              |
+| --------------------------------------------- | -------------------------------------------------------------------- |
+| heading                                       | A heading (h1–h6), linked when the widget has a link                 |
+| text editor, HTML                             | Its HTML; scripts and forms are removed and reported                 |
+| image, image gallery                          | Uploads, with the caption                                            |
+| button                                        | A link in a paragraph                                                |
+| video                                         | A YouTube or Vimeo embed block; a self-hosted video becomes a link   |
+| icon list                                     | A list, linked items linked; icons are left out                      |
+| image box, icon box                           | The image, a heading and the text                                    |
+| testimonial                                   | The image, and a quote with name and job                             |
+| accordion, toggle, tabs                       | A heading and the text of each item                                  |
+| divider                                       | A horizontal rule                                                    |
+| shortcode                                     | The shortcode, converted like shortcodes in content                  |
+| alert                                         | The title in bold and the text                                       |
+| Pro: call to action, slides, flip box         | The image, headings, texts and a button link                         |
+| Pro: blockquote, animated headline            | A quote with its author; a heading with all rotating words           |
+| spacer, menu anchor, icon, social icons       | Left out: decoration                                                 |
+| any other widget, global widgets, Elementor 4 | Left out, reported with the widget's type (`BUILDER_WIDGET_UNKNOWN`) |
+
+A page that was switched back to the WordPress editor is imported from its content. When the
+data is not valid JSON (search-and-replace tools sometimes break it), the HTML that Elementor
+stored in the post content is imported instead (`BUILDER_DATA_INVALID`). Elementor 4's new
+elements (`e-heading`, `e-paragraph`, …) are not converted yet; their containers are, and the
+elements are reported.
+
 ## Limitations
 
-- **Page builders.** For Elementor, Divi, WPBakery, Beaver Builder and Avada, the text and
-  images come over and the layout does not. Elementor content is taken from the HTML that
-  Elementor stores in the post; if that is empty, the post is empty.
+- **Page builders.** Elementor pages are converted from Elementor's data (see
+  [Elementor](#elementor)). For Divi, WPBakery, Beaver Builder and Avada, the text and images
+  come over and the layout does not.
 - **Images inside paragraphs** are placed between the paragraph's halves, because a Lexical
   upload is a block of its own.
 - **Internal links** become links to the new URL, not Lexical links to the document.

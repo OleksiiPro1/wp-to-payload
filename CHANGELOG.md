@@ -8,6 +8,15 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- Elementor. Pages built with Elementor are converted from Elementor's data (`_elementor_data`)
+  instead of the HTML Elementor stores in the content: headings, text, images and galleries,
+  buttons, videos (YouTube and Vimeo as embed blocks), icon lists, image and icon boxes,
+  testimonials, accordions, toggles, tabs, dividers, HTML, shortcodes and alerts, and the Pro
+  widgets call to action, slides, blockquote, animated headline and flip box, in reading order
+  and through the same pipeline as other content. Other widgets are reported with their type
+  (`BUILDER_WIDGET_UNKNOWN`); broken data falls back to the stored HTML (`BUILDER_DATA_INVALID`).
+  `analyze` counts the widgets and names the ones without a converter.
+
 - Menus. Every WordPress menu goes into a global, `header` or `footer`, by the `menus` setting or
   by its name, with entries in `navItems` shaped like the links of the Payload website template:
   internal links to the imported documents, archive and custom links with their new URLs, the
@@ -57,6 +66,10 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- Elementor no longer makes a site complex on its own in `analyze`: it adds 3 points, widgets
+  without a converter 1, broken data 2 and makes it complex. Items of plugin types (page builder
+  templates, Elementor's kit) no longer count in the content statistics.
+
 - ACF adds 1 point to the complexity score of `analyze` instead of 2, since its fields are
   imported now; values that are lost or have no field definition add more.
 - The required Node.js version is now what the dependencies need: 22.22.2 or newer on Node 22,
@@ -69,6 +82,9 @@ All notable changes to this project are documented here. The format follows
 - `--only` accepts the steps of custom types, which are named after their collections.
 
 ### Development
+
+- A fixture site built with Elementor 4.0.8: pages saved through Elementor's document API with
+  every converted free widget, free widgets without a converter, and a page with broken data.
 
 - A fixture site with Secure Custom Fields 6.9.7 that uses every field type, including the ones
   ACF has only in its paid version (repeater, flexible content, gallery, clone), and the
