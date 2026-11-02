@@ -46,16 +46,22 @@ export const scoreComplexity = (
     forceComplex = true
     add(3, 'WooCommerce data (shop data is not migrated in 0.1)')
   }
-  const multilingual = [
-    report.multilingual.wpml.detected ? 'WPML' : '',
-    report.multilingual.polylang.detected ? 'Polylang' : '',
-  ].filter(Boolean)
-  if (multilingual.length > 0) {
-    forceComplex = true
-    add(
-      3,
-      `${multilingual.join(' and ')} multilingual content (translations are not linked in 0.1)`,
-    )
+  const languages = report.languages
+  if (report.multilingual.wpml.detected || report.multilingual.polylang.detected) {
+    if (languages && languages.source !== 'url') {
+      const plugin = languages.source === 'polylang' ? 'Polylang' : 'WPML, experimental'
+      add(
+        2,
+        `${languages.languages.length} languages (${plugin}): each translation group becomes one document with locales`,
+      )
+    } else {
+      // Without Polylang's languages or WPML Export and Import, translations cannot be linked.
+      forceComplex = true
+      add(
+        3,
+        'multilingual content without data that links translations (WPML needs its WPML Export and Import add-on)',
+      )
+    }
   }
   if (report.acf.detected) add(2, 'Advanced Custom Fields (custom fields are not migrated in 0.1)')
 

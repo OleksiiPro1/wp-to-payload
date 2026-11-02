@@ -1,5 +1,6 @@
 import { fileURLToPath } from 'node:url'
 import { beforeAll, describe, expect, it } from 'vitest'
+import { analyzeExport } from '../../src/analyze/analyze.js'
 import { DEFAULT_CONFIG, parseConfig } from '../../src/config.js'
 import { indexLanguages, type SiteLanguages, translationsOf } from '../../src/languages.js'
 import { buildRedirects } from '../../src/redirects/build.js'
@@ -169,5 +170,26 @@ describe('URLs of a multilingual site', () => {
     expect(map['/en/werkstatt-2/']).toBeUndefined()
     expect(map['/ueber-uns/']).toBeUndefined()
     expect(map['/en/about-us/our-team/']).toBeUndefined()
+  })
+})
+
+describe('analyze', () => {
+  it('reports languages, items per language and translation groups', async () => {
+    const r = await analyzeExport(multilingual)
+    expect(r.languages).toEqual({
+      source: 'polylang',
+      defaultLanguage: 'de',
+      defaultFrom: 'urls',
+      languages: [
+        { code: 'de', name: 'Deutsch', locale: 'de_DE', items: 7 },
+        { code: 'en', name: 'English', locale: 'en_US', items: 6 },
+      ],
+      groups: { complete: 5, incomplete: 0 },
+      untranslated: 3,
+    })
+    expect(r.complexity.reasons.map((x) => x.reason)).toContain(
+      '2 languages (Polylang): each translation group becomes one document with locales',
+    )
+    expect(r.complexity.level).toBe('simple')
   })
 })

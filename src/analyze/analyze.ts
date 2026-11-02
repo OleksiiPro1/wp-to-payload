@@ -4,6 +4,7 @@ import { BUILDERS, type Builder, detectBuilders } from '../content/builders.js'
 import { BLOCK_OPENER, blockSupport, hasBlocks, normalizeBlockName } from '../content/blocks.js'
 import { scanShortcodes } from '../content/shortcodes-scan.js'
 import { DEFAULT_CONFIG } from '../config.js'
+import { LanguageCollector, wpmlKeysOf } from '../languages.js'
 import {
   BUILTIN_POST_TYPES,
   BUILTIN_TAXONOMIES,
@@ -23,6 +24,7 @@ import type {
   CustomPostType,
   CustomTaxonomy,
   Detection,
+  LanguagesReport,
   NamedCount,
   StatusCounts,
 } from './report.js'
@@ -109,6 +111,9 @@ export const analyzeExport = async (file: string): Promise<AnalyzeReport> => {
   let comments = 0
   let menuItems = 0
   const surveyor = new TypeSurveyor()
+  const languageCollector = new LanguageCollector()
+  /** Content items that count per language: no images, menus, trash or auto-drafts. */
+  const languageItems = new Set<number>()
   const mediaTypes: Record<string, number> = {}
   const mediaHosts = new Set<string>()
   const blocks = new Map<string, Usage>()
@@ -171,12 +176,25 @@ export const analyzeExport = async (file: string): Promise<AnalyzeReport> => {
         termKeys.add(key)
         terms.push(record.term)
         surveyor.addTerm(record.term)
+        languageCollector.addTerm(record.term)
       }
       continue
     }
 
     const { item } = record
     surveyor.addItem(item)
+    const wpmlKeys = wpmlKeysOf(item.meta)
+    languageCollector.addItem(
+      {
+        id: item.id,
+        type: item.type,
+        status: item.status,
+        link: item.link,
+        terms: item.terms,
+        ...(wpmlKeys ? { wpml: wpmlKeys } : {}),
+      },
+      [...item.meta.keys()].some((k) => k.startsWith('_icl_')),
+    )
     comments += item.commentCount
 
     if (item.type === 'attachment') {
@@ -215,6 +233,7 @@ export const analyzeExport = async (file: string): Promise<AnalyzeReport> => {
     // Trashed and auto-saved items are counted by status but never migrated, so their content
     // does not count.
     if (SKIPPED_STATUSES.has(item.status)) continue
+    languageItems.add(item.id)
     if (item.hasPassword) passwordProtected++
     scanContent(item)
 
@@ -239,6 +258,34 @@ export const analyzeExport = async (file: string): Promise<AnalyzeReport> => {
   }
 
   const finish = (d: Detection) => ({ ...d, detected: d.detected || d.items > 0 })
+
+  let languagesReport: LanguagesReport | undefined
+  const siteLanguages = languageCollector.result(DEFAULT_CONFIG, site?.language ?? '')
+  if (siteLanguages) {
+    const perLanguage = new Map<string, number>()
+    let untranslated = 0
+    const groups = new Set<ReadonlyMap<string, number>>()
+    for (const id of languageItems) {
+      const language = siteLanguages.itemLanguage.get(id) ?? siteLanguages.defaultLanguage
+      perLanguage.set(language, (perLanguage.get(language) ?? 0) + 1)
+      const group = siteLanguages.itemTranslations.get(id)
+      if (group && group.size > 1) groups.add(group)
+      else untranslated++
+    }
+    let complete = 0
+    for (const group of groups) if (group.size >= siteLanguages.languages.length) complete++
+    languagesReport = {
+      source: siteLanguages.source,
+      defaultLanguage: siteLanguages.defaultLanguage,
+      defaultFrom: siteLanguages.defaultFrom,
+      languages: siteLanguages.languages.map((l) => ({
+        ...l,
+        items: perLanguage.get(l.code) ?? 0,
+      })),
+      groups: { complete, incomplete: groups.size - complete },
+      untranslated,
+    }
+  }
 
   for (const key of BUILDERS) builders[key] = finish(builders[key])
   for (const key of SEO_KEYS) {
@@ -350,6 +397,7 @@ export const analyzeExport = async (file: string): Promise<AnalyzeReport> => {
       customPostTypes,
     },
     customTypes: { postTypes: customTypeList, taxonomies: customTaxonomyList },
+    ...(languagesReport ? { languages: languagesReport } : {}),
     content: {
       gutenbergItems,
       classicItems,
