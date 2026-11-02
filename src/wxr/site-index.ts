@@ -39,6 +39,7 @@ export interface IndexedPost {
   authorLogin: string
   terms: WxrItemTerm[]
   oldSlugs: string[]
+  hasPassword: boolean
   /** Language and translation group from WPML Export and Import, when the export has them. */
   wpml?: WpmlKeys
   /** The item has WPML's own meta (`_icl_…`), so the site used WPML. */
@@ -107,6 +108,7 @@ export const indexPost = (item: WxrItem): IndexedPost => {
     postDateGmt: item.postDateGmt,
     authorLogin: item.creator,
     terms: item.terms,
+    hasPassword: item.hasPassword,
     oldSlugs: (item.meta.get('_wp_old_slug') ?? [])
       .map((s) => safeDecode(s.trim()))
       .filter(Boolean),

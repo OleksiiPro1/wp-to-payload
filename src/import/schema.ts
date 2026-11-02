@@ -43,6 +43,44 @@ export class CollectionSchema {
     return Array.isArray(to) ? to.includes(collection) : to === collection
   }
 
+  /** Whether the field has a value per locale. */
+  isLocalized(name: string): boolean {
+    return this.fields.get(name)?.localized === true
+  }
+
+  /**
+   * The localized parts of a document's data, for writing a translation: localized fields, and
+   * the localized sub-fields of groups (the SEO plugin's `meta`). Also names the top-level keys
+   * that had nothing localized.
+   */
+  localizedPart(data: Record<string, unknown>): {
+    data: Record<string, unknown>
+    dropped: string[]
+  } {
+    const out: Record<string, unknown> = {}
+    const dropped: string[] = []
+    for (const [key, value] of Object.entries(data)) {
+      if (value === undefined) continue
+      const field = this.fields.get(key)
+      if (field?.localized) {
+        out[key] = value
+        continue
+      }
+      const sub = field?.flattenedFields ?? field?.fields
+      if (sub && value && typeof value === 'object' && !Array.isArray(value)) {
+        const localized = new Set(sub.filter((f) => f.localized && f.name).map((f) => f.name))
+        const nested = Object.fromEntries(
+          Object.entries(value as Record<string, unknown>).filter(([k]) => localized.has(k)),
+        )
+        if (Object.keys(nested).length > 0) out[key] = nested
+        else dropped.push(key)
+        continue
+      }
+      dropped.push(key)
+    }
+    return { data: out, dropped }
+  }
+
   /** The first relationship or upload field that can point to `collection`. */
   fieldRelatingTo(collection: string): string | undefined {
     for (const name of this.fields.keys()) if (this.relatesTo(name, collection)) return name

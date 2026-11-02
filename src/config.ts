@@ -29,6 +29,8 @@ export interface FieldNames {
   parent: string
   meta: string
   wpId: string
+  /** All WordPress IDs of a translated document (one per language). */
+  wpIds: string
 }
 
 /** Settings for a custom post type. Everything is optional; the defaults come from the export. */
@@ -111,6 +113,7 @@ export const DEFAULT_CONFIG: Config = {
     parent: 'parent',
     meta: 'meta',
     wpId: 'wpId',
+    wpIds: 'wpIds',
   },
   postTypes: {},
   taxonomies: {},
