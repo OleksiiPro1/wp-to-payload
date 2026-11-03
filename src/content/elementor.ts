@@ -224,11 +224,91 @@ const widgetHtml = (type: string, s: Settings): string | undefined => {
         button(text(s.button_text), urlOf(s.link)),
       ].join('\n\n')
   }
+  if (type.startsWith('e-')) return atomicHtml(type, s)
   return SILENT.has(type) ? '' : undefined
+}
+
+/**
+ * The value of a setting of Elementor 4's elements, which are typed: `{ "$$type": "string",
+ * "value": "…" }`. Rich text (`html-v3`) holds its HTML in `content`.
+ */
+const typed = (setting: unknown): unknown => {
+  if (!isObject(setting) || typeof setting.$$type !== 'string') return setting
+  const value = setting.value
+  if (setting.$$type === 'html-v3' && isObject(value)) return typed(value.content)
+  return value
+}
+
+const typedText = (setting: unknown): string => text(typed(setting))
+
+/**
+ * The address of a link of Elementor 4: a URL, or a post by ID (`/?p=ID`, which the pipeline
+ * turns into the post's new URL).
+ */
+const atomicLink = (setting: unknown): string => {
+  const value = typed(setting)
+  const destination = isObject(value) ? value.destination : undefined
+  if (isObject(destination) && destination.$$type === 'query') {
+    const id = Number(typed(isObject(destination.value) ? destination.value.id : undefined))
+    return id > 0 ? `/?p=${id}` : ''
+  }
+  return typedText(destination).trim()
+}
+
+/** HTML for an element of Elementor 4's editor, or undefined when there is no converter. */
+const atomicHtml = (type: string, s: Settings): string | undefined => {
+  const href = atomicLink(s.link)
+  switch (type) {
+    case 'e-heading':
+      return heading(typedText(s.title), headingTag(typed(s.tag), 'h2'), href)
+    case 'e-paragraph': {
+      const html = typedText(s.paragraph)
+      return paragraph(href ? `<a href="${escapeHtml(href)}">${html}</a>` : html)
+    }
+    case 'e-button':
+      return button(typedText(s.text), href)
+    case 'e-image': {
+      const image = typed(s.image)
+      const src = isObject(image) ? typed(image.src) : undefined
+      if (!isObject(src)) return ''
+      const id = Number(typed(src.id))
+      const url = typedText(src.url)
+      if (!url && !(id > 0)) return ''
+      return figure({ ...(id > 0 ? { id } : {}), url, alt: '' }, '', href)
+    }
+    case 'e-divider':
+      return '<hr>'
+    case 'e-youtube': {
+      const url = typedText(s.source).trim()
+      return url ? `\n\n[embed]${url}[/embed]\n\n` : ''
+    }
+    case 'e-self-hosted-video': {
+      // A URL, or a file of the media library by ID, which the `[video]` handler looks up.
+      const source = typed(s.source)
+      const url = (isObject(source) ? typedText(source.url) : typedText(source)).trim()
+      const id = isObject(source) ? Number(typed(source.id)) : 0
+      return url ? `[video src="${url}"]` : id > 0 ? `[video id="${id}"]` : ''
+    }
+    case 'e-svg':
+      return ''
+  }
+  return undefined
 }
 
 /** Elements that hold other elements: sections, columns, containers (also Elementor 4's). */
 const CONTAINER_TYPES = new Set(['section', 'column', 'container', 'e-div-block', 'e-flexbox'])
+
+/**
+ * Elements of Elementor 4 that hold other elements but are left out as a whole: a form's
+ * elements are its fields, labels and the messages shown after sending, not content.
+ */
+const WHOLE_ELEMENTS = new Set(['e-form'])
+
+const childrenOf = (element: unknown): unknown[] =>
+  isObject(element) && Array.isArray(element.elements) ? element.elements : []
+
+const elementsOf = (list: unknown[], elType: string): Record<string, unknown>[] =>
+  list.filter((e): e is Record<string, unknown> => isObject(e) && e.elType === elType)
 
 /** HTML for Elementor's elements, in reading order. */
 export const elementorToHtml = (elements: unknown[]): ElementorHtml => {
@@ -236,12 +316,42 @@ export const elementorToHtml = (elements: unknown[]): ElementorHtml => {
   const widgets = new Map<string, number>()
   const unknown: string[] = []
   const warnings: ElementorWarning[] = []
+  /**
+   * Elementor 4's tabs keep the tab titles in a menu and the contents in a separate area; like
+   * the tabs widget, each title becomes a heading followed by its content.
+   */
+  const walkTabs = (children: unknown[]) => {
+    const titles = elementsOf(children, 'e-tabs-menu').flatMap((menu) =>
+      elementsOf(childrenOf(menu), 'e-tab'),
+    )
+    const contents = elementsOf(children, 'e-tabs-content-area').flatMap((area) =>
+      elementsOf(childrenOf(area), 'e-tab-content'),
+    )
+    for (let i = 0; i < Math.max(titles.length, contents.length); i++) {
+      const start = parts.length
+      walk(childrenOf(titles[i]))
+      const title = parts
+        .splice(start)
+        .map((html) => html.replace(/^<p>([\s\S]*)<\/p>$/, '$1'))
+        .join(' ')
+      if (title.trim()) parts.push(heading(title, 'h3'))
+      walk(childrenOf(contents[i]))
+    }
+  }
   const walk = (list: unknown[]) => {
     for (const element of list) {
       if (!isObject(element)) continue
-      const children = Array.isArray(element.elements) ? element.elements : []
+      const children = childrenOf(element)
       const elType = text(element.elType)
-      if (elType !== 'widget' && (CONTAINER_TYPES.has(elType) || children.length > 0)) {
+      if (elType === 'e-tabs') {
+        walkTabs(children)
+        continue
+      }
+      if (
+        elType !== 'widget' &&
+        !WHOLE_ELEMENTS.has(elType) &&
+        (CONTAINER_TYPES.has(elType) || children.length > 0)
+      ) {
         walk(children)
         continue
       }
