@@ -118,6 +118,24 @@ describe('Elementor', () => {
     expect(warnings.map((w) => w.code)).toEqual(['BUILDER_MARKUP'])
   })
 
+  it("converts the elements of Elementor 4's editor", () => {
+    const { html, blocks, source } = prepared(15)
+    expect(source.warnings.map((w) => w.code)).toEqual(['BUILDER_MARKUP'])
+    expect(html.split('\n').filter(Boolean)).toEqual([
+      '<h2>Unsere <strong>Leistungen</strong></h2>',
+      '<p>Planung, Pflege und Teichbau aus einer Hand.</p>',
+      // An internal link by page ID gets the page's new URL.
+      '<p><a href="/kontakt">Zum Kontakt</a></p>',
+      '<img data-lexical-upload-relation-to="media" data-lexical-upload-id="m4">',
+      '<hr>',
+      '<p>WP2PBLOCK0X</p>',
+      '<p><a href="https://example.org/gartenblog">Mehr auf unserem Blog.</a></p>',
+    ])
+    expect(blocks.map((b) => [b.blockType, b.fields.url])).toEqual([
+      ['embed', 'https://www.youtube.com/watch?v=dQw4w9WgXcQ'],
+    ])
+  })
+
   it('leaves content without Elementor alone', () => {
     for (const id of [7, 8]) {
       const source = contentSource(item(id))
@@ -198,6 +216,62 @@ describe('Elementor', () => {
     ])
   })
 
+  it("converts Elementor 4's tabs, videos and links, and leaves out forms", () => {
+    const typed = (type: string, value: unknown) => ({ $$type: type, value })
+    const html = (content: string) => typed('html-v3', { content: typed('string', content) })
+    const element = (elType: string, elements: unknown[], settings = {}) => ({
+      id: 'x',
+      elType,
+      settings,
+      elements,
+    })
+    const paragraph = (content: string) => widget('e-paragraph', { paragraph: html(content) })
+    const result = elementorToHtml([
+      element('e-flexbox', [
+        widget('e-heading', {
+          title: html('Kontakt'),
+          tag: typed('string', 'div'),
+          link: typed('link', { destination: typed('url', 'https://example.org/kontakt') }),
+        }),
+        element('e-tabs', [
+          element('e-tabs-menu', [
+            element('e-tab', [paragraph('Frühling')]),
+            element('e-tab', [paragraph('Herbst')]),
+          ]),
+          element('e-tabs-content-area', [
+            element('e-tab-content', [paragraph('Pflanzen.')]),
+            element('e-tab-content', [paragraph('Laub rechen.')]),
+          ]),
+        ]),
+        widget('e-image', {
+          image: typed('image', {
+            src: typed('image-src', { id: null, url: typed('url', 'https://example.org/a.png') }),
+          }),
+        }),
+        widget('e-self-hosted-video', {
+          source: typed('video-src', { id: null, url: typed('url', 'https://example.org/a.mp4') }),
+        }),
+        // A video of the media library is named by ID; the [video] handler finds its file.
+        widget('e-self-hosted-video', {
+          source: typed('video-src', { id: typed('video-attachment-id', 21), url: null }),
+        }),
+        widget('e-svg', { svg: typed('svg-src', { id: null, url: typed('url', '/a.svg') }) }),
+        element('e-form', [element('e-form-success-message', [paragraph('Danke!')])]),
+      ]),
+    ])
+    expect(result.html.split('\n\n').filter(Boolean)).toEqual([
+      '<p><a href="https://example.org/kontakt">Kontakt</a></p>',
+      '<h3>Frühling</h3>',
+      '<p>Pflanzen.</p>',
+      '<h3>Herbst</h3>',
+      '<p>Laub rechen.</p>',
+      '<figure><img src="https://example.org/a.png" alt=""></figure>',
+      '[video src="https://example.org/a.mp4"]',
+      '[video id="21"]',
+    ])
+    expect(result.unknown).toEqual(['e-form'])
+  })
+
   it('reads only valid data', () => {
     expect(parseElementorData('[{"elType":"section"}]')).toEqual([{ elType: 'section' }])
     expect(parseElementorData('{"elType":"section"}')).toBeUndefined()
@@ -215,9 +289,9 @@ describe('Elementor', () => {
     const r = await analyzeExport(exportFile)
     expect(r.builders.elementor).toMatchObject({
       detected: true,
-      items: 3,
+      items: 4,
       details: {
-        converted: 2,
+        converted: 3,
         invalidData: 1,
         withoutConverter: ['counter', 'google_maps'],
       },
@@ -227,9 +301,11 @@ describe('Elementor', () => {
       'text-editor': 2,
       image: 2,
       counter: 1,
+      'e-heading': 1,
+      'e-paragraph': 2,
     })
     expect(r.complexity.reasons.map((x) => [x.points, x.reason])).toEqual([
-      [3, 'Elementor on 3 items (widgets are converted, the layout is not)'],
+      [3, 'Elementor on 4 items (widgets are converted, the layout is not)'],
       [1, 'Elementor widgets without a converter: counter, google_maps'],
       [2, 'broken Elementor data on 1 items (their stored HTML is used)'],
       [1, 'plugin shortcodes: contact-form-7'],

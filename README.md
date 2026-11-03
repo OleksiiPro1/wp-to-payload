@@ -417,30 +417,34 @@ images become uploads, links get their new URLs, shortcodes and embeds are handl
 else. The layout itself (columns, spacing, colours, styles) is not migrated, and the report says
 so for every page (`BUILDER_MARKUP`).
 
-| Widget                                        | Becomes                                                              |
-| --------------------------------------------- | -------------------------------------------------------------------- |
-| heading                                       | A heading (h1–h6), linked when the widget has a link                 |
-| text editor, HTML                             | Its HTML; scripts and forms are removed and reported                 |
-| image, image gallery                          | Uploads, with the caption                                            |
-| button                                        | A link in a paragraph                                                |
-| video                                         | A YouTube or Vimeo embed block; a self-hosted video becomes a link   |
-| icon list                                     | A list, linked items linked; icons are left out                      |
-| image box, icon box                           | The image, a heading and the text                                    |
-| testimonial                                   | The image, and a quote with name and job                             |
-| accordion, toggle, tabs                       | A heading and the text of each item                                  |
-| divider                                       | A horizontal rule                                                    |
-| shortcode                                     | The shortcode, converted like shortcodes in content                  |
-| alert                                         | The title in bold and the text                                       |
-| Pro: call to action, slides, flip box         | The image, headings, texts and a button link                         |
-| Pro: blockquote, animated headline            | A quote with its author; a heading with all rotating words           |
-| spacer, menu anchor, icon, social icons       | Left out: decoration                                                 |
-| any other widget, global widgets, Elementor 4 | Left out, reported with the widget's type (`BUILDER_WIDGET_UNKNOWN`) |
+| Widget                                                     | Becomes                                                              |
+| ---------------------------------------------------------- | -------------------------------------------------------------------- |
+| heading                                                    | A heading (h1–h6), linked when the widget has a link                 |
+| text editor, HTML                                          | Its HTML; scripts and forms are removed and reported                 |
+| image, image gallery                                       | Uploads, with the caption                                            |
+| button                                                     | A link in a paragraph                                                |
+| video                                                      | A YouTube or Vimeo embed block; a self-hosted video becomes a link   |
+| icon list                                                  | A list, linked items linked; icons are left out                      |
+| image box, icon box                                        | The image, a heading and the text                                    |
+| testimonial                                                | The image, and a quote with name and job                             |
+| accordion, toggle, tabs                                    | A heading and the text of each item                                  |
+| divider                                                    | A horizontal rule                                                    |
+| shortcode                                                  | The shortcode, converted like shortcodes in content                  |
+| alert                                                      | The title in bold and the text                                       |
+| Pro: call to action, slides, flip box                      | The image, headings, texts and a button link                         |
+| Pro: blockquote, animated headline                         | A quote with its author; a heading with all rotating words           |
+| Elementor 4: heading, paragraph, button, image             | Like the widgets above; a link to a page gets the page's new URL     |
+| Elementor 4: divider, YouTube, video                       | A horizontal rule; an embed block; a link to the file                |
+| Elementor 4: tabs                                          | A heading and the content of each tab                                |
+| spacer, menu anchor, icon, social icons, Elementor 4's SVG | Left out: decoration                                                 |
+| any other widget or Elementor 4 element, global widgets    | Left out, reported with the widget's type (`BUILDER_WIDGET_UNKNOWN`) |
 
 A page that was switched back to the WordPress editor is imported from its content. When the
 data is not valid JSON (search-and-replace tools sometimes break it), the HTML that Elementor
-stored in the post content is imported instead (`BUILDER_DATA_INVALID`). Elementor 4's new
-elements (`e-heading`, `e-paragraph`, …) are not converted yet; their containers are, and the
-elements are reported.
+stored in the post content is imported instead (`BUILDER_DATA_INVALID`). Elementor 4's editor
+saves its elements (`e-heading`, `e-paragraph`, …) with typed settings, which are read as such,
+and its containers (`e-flexbox`, `e-div-block`) are read like sections. Its forms are left out
+and reported, like the form widget of Elementor Pro.
 
 ## Limitations
 

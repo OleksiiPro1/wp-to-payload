@@ -135,6 +135,9 @@ code, as themes do; it is not in the export, and the tests pass it with `--acf-j
 - Elementor saves documents only for a user who may edit them, and marks them as built with
   Elementor only when asked (`set_is_built_with_elementor`); the `elementor` scenario does both.
   Built from Git, Elementor reports its version as 4.0.0; the release build would set 4.0.8.
+  The Git build also lacks the copy of Twig that the release build bundles, so saving a page
+  made with Elementor 4's elements stops after the data is stored, when Elementor renders the
+  plain text for the post content; the scenario checks that the data is there and goes on.
 
 ## Changes
 

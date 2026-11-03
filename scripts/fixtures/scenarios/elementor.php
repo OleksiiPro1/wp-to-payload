@@ -5,9 +5,10 @@
  *
  * Pages and a post built with Elementor's free widgets, saved through Elementor's own document
  * API as the editor does: sections with columns, inner sections and flexbox containers, and
- * every widget the import converts, plus free widgets it has no converter for. One page has
- * broken Elementor data, as search-and-replace tools sometimes leave it. A plain page and a
- * plain post show that content without Elementor is not affected. All content is made up.
+ * every widget the import converts, plus free widgets it has no converter for. One page is made
+ * with the elements of Elementor 4's editor, one has broken Elementor data, as
+ * search-and-replace tools sometimes leave it. A plain page and a plain post show that content
+ * without Elementor is not affected. All content is made up.
  */
 
 require __DIR__ . '/../lib/fixtures.php';
@@ -399,6 +400,118 @@ $broken = el_document(
 );
 update_post_meta( $broken, '_elementor_data', wp_slash( '[{"id":"e100001","elType":"container","settings":[],"elements":[{"id":"e101001"' ) );
 fx_fix_modified( $broken, '2024-01-04 10:00:00' );
+
+// A page made with the elements of Elementor 4's editor, whose settings are typed values
+// ({"$$type": "string", "value": "…"}). They come last, so the IDs above stay the same.
+function el_value( string $type, $value ): array {
+	return array(
+		'$$type' => $type,
+		'value'  => $value,
+	);
+}
+function el_html( string $html ): array {
+	return el_value( 'html-v3', array( 'content' => el_value( 'string', $html ) ) );
+}
+$atomic    = fx_post(
+	array(
+		'post_type'    => 'page',
+		'post_title'   => 'Leistungen',
+		'post_name'    => 'leistungen',
+		'post_date'    => '2024-01-05 10:00:00',
+		'post_content' => '',
+	)
+);
+$atomic_doc = \Elementor\Plugin::$instance->documents->get( $atomic );
+$atomic_doc->set_is_built_with_elementor( true );
+try {
+	$atomic_doc->save(
+		array(
+			'elements' => array(
+				el(
+					'g100001',
+					'e-flexbox',
+					array(),
+					array(
+						el_widget(
+							'g101001',
+							'e-heading',
+							array(
+								'title' => el_html( 'Unsere <strong>Leistungen</strong>' ),
+								'tag'   => el_value( 'string', 'h2' ),
+							)
+						),
+						el_widget( 'g101002', 'e-paragraph', array( 'paragraph' => el_html( 'Planung, Pflege und Teichbau aus einer Hand.' ) ) ),
+						el_widget(
+							'g101003',
+							'e-button',
+							array(
+								'text' => el_html( 'Zum Kontakt' ),
+								'link' => el_value(
+									'link',
+									array(
+										// An internal link names the page by ID.
+										'destination'   => el_value( 'query', array( 'id' => el_value( 'number', $contact ) ) ),
+										'isTargetBlank' => el_value( 'boolean', false ),
+									)
+								),
+							)
+						),
+						el(
+							'g102001',
+							'e-div-block',
+							array(),
+							array(
+								el_widget(
+									'g102002',
+									'e-image',
+									array(
+										'image' => el_value(
+											'image',
+											array(
+												'src'  => el_value(
+													'image-src',
+													array(
+														'id'  => el_value( 'image-attachment-id', $pond ),
+														'url' => null,
+													)
+												),
+												'size' => el_value( 'string', 'large' ),
+											)
+										),
+									)
+								),
+								el_widget( 'g102003', 'e-divider', array() ),
+								el_widget( 'g102004', 'e-youtube', array( 'source' => el_value( 'string', 'https://www.youtube.com/watch?v=dQw4w9WgXcQ' ) ) ),
+								el_widget(
+									'g102005',
+									'e-paragraph',
+									array(
+										'paragraph' => el_html( 'Mehr auf unserem Blog.' ),
+										'link'      => el_value(
+											'link',
+											array(
+												'destination'   => el_value( 'url', 'https://example.org/gartenblog' ),
+												'isTargetBlank' => el_value( 'boolean', true ),
+											)
+										),
+									)
+								),
+							)
+						),
+					)
+				),
+			),
+		)
+	);
+} catch ( \Throwable $e ) {
+	// The data is saved first. Then Elementor renders the page to the plain text it keeps in the
+	// post content, which for these elements needs the Twig copy of Elementor's release build;
+	// built from Git, the plugin has none, so the content stays empty.
+	if ( ! get_post_meta( $atomic, '_elementor_data', true ) ) {
+		fx_fail( 'Elementor did not save the page Leistungen: ' . $e->getMessage() );
+	}
+}
+fx_fix_modified( $atomic, '2024-01-05 10:00:00' );
 
 // Elementor creates its default kit (global colours and fonts) with the current time.
 $kits = get_posts(

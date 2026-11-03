@@ -20,11 +20,14 @@ listed under 0.1.0 as well.
 - Elementor. Pages built with Elementor are converted from Elementor's data (`_elementor_data`)
   instead of the HTML Elementor stores in the content: headings, text, images and galleries,
   buttons, videos (YouTube and Vimeo as embed blocks), icon lists, image and icon boxes,
-  testimonials, accordions, toggles, tabs, dividers, HTML, shortcodes and alerts, and the Pro
-  widgets call to action, slides, blockquote, animated headline and flip box, in reading order
-  and through the same pipeline as other content. Other widgets are reported with their type
-  (`BUILDER_WIDGET_UNKNOWN`); broken data falls back to the stored HTML (`BUILDER_DATA_INVALID`).
-  `analyze` counts the widgets and names the ones without a converter.
+  testimonials, accordions, toggles, tabs, dividers, HTML, shortcodes and alerts, the Pro
+  widgets call to action, slides, blockquote, animated headline and flip box, and the elements
+  of Elementor 4's editor (heading, paragraph, button, image, divider, YouTube, video, tabs and
+  its containers), in reading order and through the same pipeline as other content. Other
+  widgets are reported with their type (`BUILDER_WIDGET_UNKNOWN`); broken data falls back to the
+  stored HTML (`BUILDER_DATA_INVALID`). `analyze` counts the widgets and names the ones without
+  a converter. Images and videos that Elementor names by their ID alone are found in the
+  export, and reported when they are not there.
 
 - Menus. Every WordPress menu goes into a global, `header` or `footer`, by the `menus` setting or
   by its name, with entries in `navItems` shaped like the links of the Payload website template:
@@ -93,7 +96,8 @@ listed under 0.1.0 as well.
 ### Development
 
 - A fixture site built with Elementor 4.0.8: pages saved through Elementor's document API with
-  every converted free widget, free widgets without a converter, and a page with broken data.
+  every converted free widget, free widgets without a converter, a page made with the elements
+  of Elementor 4's editor, and a page with broken data.
 
 - A fixture site with Secure Custom Fields 6.9.7 that uses every field type, including the ones
   ACF has only in its paid version (repeater, flexible content, gallery, clone), and the

@@ -61,7 +61,7 @@ describe.skipIf(!projectInstalled())('import of a site built with Elementor', ()
     expect(r.errors).toEqual([])
     expect(r.phases).toMatchObject({
       media: { created: 4, failed: 0 },
-      pages: { created: 3, failed: 0 },
+      pages: { created: 4, failed: 0 },
       posts: { created: 2, failed: 0 },
     })
     const data = queryPayload<Record<string, Page>>(
@@ -81,10 +81,10 @@ describe.skipIf(!projectInstalled())('import of a site built with Elementor', ()
           nodes: (doc.content?.root.children ?? []).map((n: any) =>
             n.type === 'heading' ? n.tag : n.type === 'block' ? 'block:' + n.fields.blockType : n.type),
           links,
-          text: texts.join(' '),
+          text: texts.join(' ').replace(/\\s+/g, ' '),
         }
       }
-      return { home: await page('pages', 9), spring: await page('posts', 11), about: await page('pages', 13), plain: await page('posts', 8) }`,
+      return { home: await page('pages', 9), spring: await page('posts', 11), about: await page('pages', 13), plain: await page('posts', 8), atomic: await page('pages', 15) }`,
     )
     // Widgets in reading order: headings, text, a button, images, a list, a gallery, a YouTube
     // embed block, a quote, accordion and tab items, a divider, HTML, an alert, an inner section.
@@ -136,6 +136,20 @@ describe.skipIf(!projectInstalled())('import of a site built with Elementor', ()
       text: 'Über uns Eine kleine Gärtnerei.',
     })
     expect(data.plain?.nodes).toEqual(['paragraph'])
+    // A page made with the elements of Elementor 4's editor.
+    expect(data.atomic).toEqual({
+      nodes: [
+        'h2',
+        'paragraph',
+        'paragraph',
+        'upload',
+        'horizontalrule',
+        'block:embed',
+        'paragraph',
+      ],
+      links: ['/kontakt', 'https://example.org/gartenblog'],
+      text: 'Unsere Leistungen Planung, Pflege und Teichbau aus einer Hand. Zum Kontakt Mehr auf unserem Blog.',
+    })
     expect(r.warnings.map((w) => [w.code, w.wpId ?? null, w.subject])).toEqual([
       ['TYPE_SKIPPED', null, 'elementor_library'],
       ['BUILDER_MARKUP', 9, 'elementor'],
@@ -146,6 +160,7 @@ describe.skipIf(!projectInstalled())('import of a site built with Elementor', ()
       ['BUILDER_MARKUP', 11, 'elementor'],
       ['BUILDER_DATA_INVALID', 13, 'elementor'],
       ['BUILDER_MARKUP', 13, 'elementor'],
+      ['BUILDER_MARKUP', 15, 'elementor'],
     ])
   })
 })
