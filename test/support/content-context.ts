@@ -25,6 +25,7 @@ export const contentContext = (
     mediaCollection: 'media',
     capabilities: { ...ALL_CAPABILITIES, ...capabilities },
     builders: [],
+    pattern: (id) => index.patterns.get(id),
     warnings: new WarningCollector(),
     ...rest,
   }

@@ -58,6 +58,8 @@ export interface SiteIndex {
   acf: AcfIndex
   /** Menus with their entries. */
   menus: WpMenu[]
+  /** Content of synced patterns (reusable blocks, `wp_block` items) by ID. */
+  patterns: Map<number, string>
   issues: WxrParseIssue[]
 }
 
@@ -164,6 +166,7 @@ export const buildSiteIndex = async (file: string | Readable): Promise<SiteIndex
     posts: new Map(),
     acf: { definitions: [], usage: new Map(), utcOffsets: new Map() },
     menus: [],
+    patterns: new Map(),
     issues: [],
   }
   const termKeys = new Set<string>()
@@ -192,6 +195,9 @@ export const buildSiteIndex = async (file: string | Readable): Promise<SiteIndex
         const { item } = record
         acf.addItem(item)
         menus.addItem(item)
+        if (item.type === 'wp_block' && item.status !== 'trash') {
+          index.patterns.set(item.id, item.content)
+        }
         if (item.type === 'attachment') {
           const attachment = indexAttachment(item)
           if (attachment) index.attachments.set(item.id, attachment)

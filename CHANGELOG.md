@@ -6,13 +6,17 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
-## [0.2.0] - 2026-11-02
+## [0.2.0] - 2026-11-03
 
 0.1.0 was not published to npm, so 0.2.0 is the first version there and includes everything
 listed under 0.1.0 as well.
 
 ### Added
 
+- Synced patterns (reusable blocks) are inlined where they are used, instead of being removed:
+  their content is in the export as `wp_block` items. Patterns inside patterns work, a pattern
+  that contains itself stops with a warning, and pattern overrides of headings and paragraphs
+  are applied; other overrides are reported (`BLOCK_PARTIAL`).
 - Elementor. Pages built with Elementor are converted from Elementor's data (`_elementor_data`)
   instead of the HTML Elementor stores in the content: headings, text, images and galleries,
   buttons, videos (YouTube and Vimeo as embed blocks), icon lists, image and icon boxes,

@@ -19,13 +19,54 @@ const imageElement = (ctx: ContentContext, id: number): string => {
   return `<img src="${escapeHtml(a.url)}" alt="${escapeHtml(a.alt ?? '')}" class="wp-image-${id}">`
 }
 
+/** Blocks whose text a pattern override can replace: their `content` attribute. */
+const OVERRIDABLE = new Set(['core/paragraph', 'core/heading'])
+
+/**
+ * Pattern overrides (WordPress 6.6+): a `core/block` reference can carry new values for blocks
+ * of the pattern that have a name and are bound to `core/pattern-overrides`. Paragraph and
+ * heading texts are applied; any other override is reported.
+ */
+const applyOverrides = (
+  blocks: ParsedBlock[],
+  overrides: Record<string, unknown>,
+  unapplied: Set<string>,
+): ParsedBlock[] =>
+  blocks.map((b) => {
+    const metadata = b.attrs.metadata as { name?: unknown } | undefined
+    const name = typeof metadata?.name === 'string' ? metadata.name : undefined
+    const values = name === undefined ? undefined : overrides[name]
+    let block = { ...b, innerBlocks: applyOverrides(b.innerBlocks, overrides, unapplied) }
+    if (!values || typeof values !== 'object') return block
+    for (const [attribute, value] of Object.entries(values as Record<string, unknown>)) {
+      const blockName = normalizeBlockName(b.name ?? '')
+      if (attribute === 'content' && typeof value === 'string' && OVERRIDABLE.has(blockName)) {
+        // The stored HTML holds the pattern's text; keep its tag and attributes, swap the text.
+        block = {
+          ...block,
+          innerContent: block.innerContent.map((html) =>
+            html === null
+              ? null
+              : html.replace(/^(\s*<[a-z0-9]+\b[^>]*>)[\s\S]*(<\/[a-z0-9]+>\s*)$/i, `$1${value}$2`),
+          ),
+        }
+      } else {
+        unapplied.add(`${blockName} ${attribute}`)
+      }
+    }
+    return block
+  })
+
 const renderBlock = (
   b: ParsedBlock,
   ctx: ContentContext,
   reported: Set<string>,
   shortcodes: (html: string) => string,
+  /** Synced patterns being rendered, outermost first, against reference loops. */
+  patterns: number[] = [],
 ): string => {
-  const inner = () => joinInnerContent(b, (child) => renderBlock(child, ctx, reported, shortcodes))
+  const inner = () =>
+    joinInnerContent(b, (child) => renderBlock(child, ctx, reported, shortcodes, patterns))
   // Classic content and shortcode blocks: shortcodes first, then paragraphs, as WordPress does.
   if (b.name === null || b.name === 'core/freeform' || b.name === 'core/shortcode') {
     return autop(shortcodes(inner()))
@@ -51,11 +92,40 @@ const renderBlock = (
   }
 
   if (name === 'core/block') {
-    once(
-      'BLOCK_REMOVED',
-      'Reusable block (synced pattern) removed: its content is stored separately.',
-    )
-    return ''
+    // A synced pattern: its content is a `wp_block` item of the export.
+    const ref = Number(b.attrs.ref)
+    const content = Number.isInteger(ref) && ref > 0 ? ctx.pattern?.(ref) : undefined
+    if (content === undefined) {
+      const id = Number.isInteger(ref) && ref > 0 ? `${ref} ` : ''
+      once(
+        'BLOCK_REMOVED',
+        `Synced pattern (reusable block) ${id}removed: it is not in the export.`,
+      )
+      return ''
+    }
+    if (patterns.includes(ref)) {
+      once(
+        'BLOCK_REMOVED',
+        `Synced pattern ${ref} contains itself; the repeated part was left out.`,
+      )
+      return ''
+    }
+    if (!hasBlocks(content)) return autop(shortcodes(content))
+    const overrides =
+      b.attrs.content && typeof b.attrs.content === 'object'
+        ? (b.attrs.content as Record<string, unknown>)
+        : {}
+    const unapplied = new Set<string>()
+    const html = applyOverrides(parseBlocks(content), overrides, unapplied)
+      .map((child) => renderBlock(child, ctx, reported, shortcodes, [...patterns, ref]))
+      .join('\n')
+    if (unapplied.size > 0) {
+      once(
+        'BLOCK_PARTIAL',
+        `Synced pattern ${ref}: overrides of ${[...unapplied].join(', ')} were not applied; the pattern's own values were kept.`,
+      )
+    }
+    return html
   }
 
   const support = blockSupport(name)
