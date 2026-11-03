@@ -100,6 +100,7 @@ template's `header` and `footer` globals get the menus as they are.
 | Gutenberg: paragraph, heading, list, quote, image, gallery, code, preformatted, table, separator, buttons, embed, columns, group | Lexical rich text; code and embeds as blocks                                                        | ✅  |
 | Gutenberg: cover, media & text, pullquote, verse, details, audio, video, file                                                    | Content kept, layout lost; players become links                                                     | ⚠️  |
 | Gutenberg: dynamic blocks (latest posts, query loops, navigation, …)                                                             | Removed, listed in the report                                                                       | ❌  |
+| Synced patterns (reusable blocks)                                                                                                | Inlined where they are used; overrides of headings and paragraphs applied                           | ✅  |
 | Blocks from plugins                                                                                                              | HTML converted as is, listed in the report                                                          | ⚠️  |
 | Classic editor content                                                                                                           | Paragraphs and line breaks as WordPress shows them                                                  | ✅  |
 | `[caption]`, `[gallery]`, `[embed]`                                                                                              | Images, captions and embeds                                                                         | ✅  |
@@ -471,7 +472,6 @@ elements are reported.
 - ACF options pages and ACF blocks
 - Comments
 - Nested menus (for headers that support them)
-- Reusable blocks (synced patterns) inlined into the content
 - Lexical internal links to documents
 - All in One SEO and SEOPress
 - The WordPress REST API as a second source
