@@ -186,6 +186,8 @@ const handleShortcode = (s: Shortcode, ctx: ContentContext, reported: Set<string
       return content.trim() ? embedElement(stripTags(content).trim()) : ''
     case 'audio':
     case 'video': {
+      // `id` is not WordPress's: the Elementor converter names a file of the media library so.
+      const id = Number(s.attrs.id)
       const src =
         s.attrs.src ??
         s.attrs.mp3 ??
@@ -193,8 +195,18 @@ const handleShortcode = (s: Shortcode, ctx: ContentContext, reported: Set<string
         s.attrs.m4a ??
         s.attrs.ogg ??
         s.attrs.webm ??
-        s.attrs.wav
-      if (!src) return ''
+        s.attrs.wav ??
+        (id > 0 ? ctx.media.get(id)?.url : undefined)
+      if (!src) {
+        if (id > 0) {
+          ctx.warnings.add(
+            'REFERENCE_MISSING',
+            `The file ${id} of a [${s.name}] player is not in the export; the player was left out.`,
+            `[${s.name}]`,
+          )
+        }
+        return ''
+      }
       warnOnce('EMBED_AS_LINK', `[${s.name}] player replaced by a link to the file.`)
       return `<p><a href="${escapeHtml(src)}">${escapeHtml(src.split('/').pop() ?? src)}</a></p>`
     }

@@ -313,19 +313,29 @@ export const prepareDom = (html: string, ctx: ContentContext): PreparedContent =
       img.replaceWith(upload)
       continue
     }
-    if (!src) {
+    // Elementor can name an image by its ID alone.
+    const url = src || (wpId === undefined ? '' : (ctx.media.get(wpId)?.url ?? ''))
+    if (!url) {
+      const id = /\bwp-image-(\d+)\b/.exec(img.getAttribute('class') ?? '')?.[1]
+      if (id) {
+        ctx.warnings.add(
+          'IMAGE_NOT_FOUND',
+          `Image ${id} is not in the export's media library; it was left out.`,
+          `wp-image-${id}`,
+        )
+      }
       img.remove()
       continue
     }
     ctx.warnings.add(
       'IMAGE_NOT_FOUND',
       wpId === undefined
-        ? `Image ${src} is not in the export's media library; replaced by a link.`
-        : `Image ${src} was not imported; replaced by a link.`,
-      src,
+        ? `Image ${url} is not in the export's media library; replaced by a link.`
+        : `Image ${url} was not imported; replaced by a link.`,
+      url,
     )
     const alt = img.getAttribute('alt')?.trim()
-    img.replaceWith(linkParagraph(src, alt || src.split('/').pop() || src))
+    img.replaceWith(linkParagraph(url, alt || url.split('/').pop() || url))
   }
 
   // Links: internal links point to the new site.

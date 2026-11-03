@@ -235,4 +235,47 @@ describe('prepareContent: links to files', () => {
       '<p><a href="/api/media/file/loaf.png">Price list</a> and <a href="https://blog.example.com/wp-content/uploads/2024/02/croissant.png">menu</a></p>',
     )
   })
+
+  it('are found by ID alone, as Elementor names them, and missing ones are reported', () => {
+    // 101 was imported, 102 is in the export but was not imported, 999 is not in the export.
+    const ctx = contentContext(index, {
+      postId: 22,
+      mediaId: (wpId) => (wpId === 101 ? 'm101' : undefined),
+    })
+    const { html } = prepareContent(
+      [
+        '<figure><img src="" alt="" class="wp-image-101"></figure>',
+        '<figure><img src="" alt="" class="wp-image-102"></figure>',
+        '<figure><img src="" alt="" class="wp-image-999"></figure>',
+        '[video id="102"]',
+        '[video id="999"]',
+      ].join('\n\n'),
+      ctx,
+    )
+    expect(compact(html)).toBe(
+      [
+        '<img data-lexical-upload-relation-to="media" data-lexical-upload-id="m101">',
+        '<p><a href="https://blog.example.com/wp-content/uploads/2024/01/loaf.png">loaf.png</a></p>',
+        '<p><a href="https://blog.example.com/wp-content/uploads/2024/01/loaf.png">loaf.png</a></p>',
+      ].join(''),
+    )
+    expect(ctx.warnings.warnings.map((w) => [w.code, w.subject, w.message])).toEqual([
+      ['EMBED_AS_LINK', '[video]', '[video] player replaced by a link to the file.'],
+      [
+        'REFERENCE_MISSING',
+        '[video]',
+        'The file 999 of a [video] player is not in the export; the player was left out.',
+      ],
+      [
+        'IMAGE_NOT_FOUND',
+        'https://blog.example.com/wp-content/uploads/2024/01/loaf.png',
+        'Image https://blog.example.com/wp-content/uploads/2024/01/loaf.png was not imported; replaced by a link.',
+      ],
+      [
+        'IMAGE_NOT_FOUND',
+        'wp-image-999',
+        "Image 999 is not in the export's media library; it was left out.",
+      ],
+    ])
+  })
 })
