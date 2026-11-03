@@ -42,6 +42,8 @@ export interface ContentContext {
   capabilities: EditorCapabilities
   /** Page builders the item was made with (from `detectBuilders`). */
   builders: Builder[]
+  /** Content of a synced pattern (reusable block), for `core/block` references to it. */
+  pattern?: (id: number) => string | undefined
   warnings: WarningCollector
 }
 

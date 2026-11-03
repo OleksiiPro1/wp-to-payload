@@ -5,6 +5,8 @@
 export type BlockSupport = 'supported' | 'partial' | 'dropped' | 'unknown'
 
 const SUPPORTED = new Set([
+  // Synced patterns: their content is in the export and goes where they are used.
+  'core/block',
   'core/paragraph',
   'core/heading',
   'core/list',
@@ -61,7 +63,6 @@ const DROPPED = new Set([
   'core/query',
   'core/post-template',
   'core/query-pagination',
-  'core/block',
   'core/site-logo',
   'core/site-title',
   'core/page-list',

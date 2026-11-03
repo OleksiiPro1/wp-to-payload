@@ -674,6 +674,7 @@ export const importExport = async (
         mediaCollection: slugs.media,
         capabilities: editor.info.capabilities,
         builders: [],
+        pattern: (id) => index.patterns.get(id),
         warnings: itemWarnings,
       }
       const state = htmlToLexical(
@@ -1058,6 +1059,7 @@ export const importExport = async (
         mediaCollection: slugs.media,
         capabilities: editor.info.capabilities,
         builders: source.builders,
+        pattern: (id) => index.patterns.get(id),
         warnings: itemWarnings,
       }
       const state = htmlToLexical(
