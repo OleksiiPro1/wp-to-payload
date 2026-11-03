@@ -200,6 +200,8 @@ describe.skipIf(!projectInstalled())('import of a real WordPress export', () => 
         'upload:croissant.png',
         'paragraph',
         'paragraph',
+        // The synced pattern with the opening hours.
+        'paragraph',
       ],
     })
     expect(data.team).toEqual({ parent: 'ueber-uns', image: 'backstube-scaled.png' })

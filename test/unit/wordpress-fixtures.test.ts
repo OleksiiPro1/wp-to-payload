@@ -133,7 +133,7 @@ describe('real WordPress exports', () => {
     expect(r.content).toMatchObject({ gutenbergItems: 13, classicItems: 1, passwordProtected: 1 })
     const support = Object.fromEntries(r.content.blocks.map((b) => [b.name, b.support]))
     expect(support).toMatchObject({
-      'core/block': 'dropped',
+      'core/block': 'supported',
       'core/latest-posts': 'dropped',
       'core/embed': 'supported',
     })
@@ -167,8 +167,10 @@ describe('real WordPress exports', () => {
       const order = [...html.matchAll(/WP2PBLOCK\d+X/g)].map((m) => byToken.get(m[0]))
       expect(order).toEqual(['code', 'embed'])
       expect(html).toContain('href="/blog/neue-oeffnungszeiten"')
+      // The synced pattern of the export stands where the post uses it.
+      expect(index.patterns.get(7)).toContain('Montag bis Samstag, 6 bis 18 Uhr.')
+      expect(html).toContain('<p>Montag bis Samstag, 6 bis 18 Uhr.</p>')
       expect(ctx.warnings.warnings.map((w) => `${w.code}:${w.subject}`)).toEqual([
-        'BLOCK_REMOVED:core/block',
         'BLOCK_REMOVED:core/latest-posts',
       ])
       const team = contentContext(index, { postId: item('team').id })
